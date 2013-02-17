@@ -67,6 +67,8 @@
         devices, you can define the device in your toolchain compiler preprocessor.
   */
 
+#define assert_param(x) x
+
 #if !defined (STM32F4XX)
  #error "Please select first the target STM32F4XX device used in your application (in stm32f4xx.h file)"
 #endif

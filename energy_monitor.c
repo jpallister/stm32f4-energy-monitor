@@ -18,30 +18,38 @@ typedef struct {
     unsigned long timestamp;                // Timestamp for beginning
     unsigned short data[CONV_BUF_SIZE];     // The data
     unsigned char  filled;                  // Whether this slot is filled
-    unsigned char  pattern;                 // Pattern of voltages and currents
     unsigned char  input;                   // Which ADC this came from
 } ADC_Data;
 
-ADC_Data data_bufs[4];
+ADC_Data data_bufs[8] = {0};
+int cur_buf = 0;
 
 unsigned short ADC1_data0[CONV_BUF_SIZE];     // The data for ADC1
 unsigned short ADC1_data1[CONV_BUF_SIZE];     // The data for ADC1
 
-int dma_count = 0;
+unsigned long dma_count = 0;
+unsigned long tm_count = 0;
+unsigned long last_tm_count = 0;
 
 void DMA2_Stream0_IRQHandler()
 {
     if(DMA_GetITStatus(DMA2_Stream0, DMA_IT_TCIF0) != RESET)
     {
         DMA_ClearITPendingBit(DMA2_Stream0, DMA_IT_TCIF0);
+        memcpy(&data_bufs[cur_buf], ADC1_data0, sizeof(unsigned short)*CONV_BUF_SIZE);
+        data_bufs[cur_buf].filled = 1;
         DMA_ClearFlag(DMA2_Stream0, DMA_FLAG_TCIF0);
+
         dma_count = (dma_count + 1) & ((1 << 8)-1);
         if(dma_count == 0)
             GPIO_ToggleBits(GPIOD, GPIO_Pin_12);
+        data_bufs[cur_buf].timestamp = last_tm_count;
+
+        last_tm_count = tm_count;
+        cur_buf = (cur_buf + 1) & 7;
     }
 }
 
-int tm_count = 0;
 
 void TIM2_IRQHandler()
 {
@@ -151,7 +159,7 @@ int main()
     // TIM_TimeBaseStructure.TIM_Period = 15; //~2MHz trigger
     // TIM_TimeBaseStructure.TIM_Period = 30; //~1MHz trigger
     TIM_TimeBaseStructure.TIM_Period = 101; //~0.5MHz trigger
-    TIM_TimeBaseStructure.TIM_Prescaler = (uint16_t) ((SystemCoreClock / 2) / 50000000) - 1;
+    TIM_TimeBaseStructure.TIM_Prescaler = 0;//(uint16_t) ((SystemCoreClock / 2) / 720000000) - 1;
     TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
     TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
     TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
