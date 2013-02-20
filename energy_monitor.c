@@ -232,6 +232,7 @@ static void cdcacm_set_config(usbd_device *usbd_dev, u16 wValue)
 
 #define DATA_BUF_BYTELEN    64
 #define DATA_BUF_SHORTLEN    (DATA_BUF_BYTELEN/2)
+#define DATA_BUF_LONGLEN    (DATA_BUF_BYTELEN/4)
 #define NUM_BUFFERS         8
 
 typedef struct {
@@ -246,22 +247,22 @@ typedef struct {
 power_data data_bufs[NUM_BUFFERS];
 
 short dbuf0[DATA_BUF_SHORTLEN];
-int cur_buf = 0;
+short dbuf1[DATA_BUF_SHORTLEN];
+int cur_buf = 0;;
 
 
 void dma_setup()
 {
     dma_stream_reset(DMA2, DMA_STREAM0);
 
-
     dma_set_peripheral_address(DMA2, DMA_STREAM0, (u32)&ADC1_DR);
-    dma_set_memory_address(DMA2, DMA_STREAM0, (u32)dbuf0);
+    dma_set_memory_address(DMA2, DMA_STREAM0, (u32)&dbuf0);
     dma_set_number_of_data(DMA2, DMA_STREAM0, DATA_BUF_SHORTLEN);
     dma_set_transfer_mode(DMA2, DMA_STREAM0, DMA_SxCR_DIR_PERIPHERAL_TO_MEM);
     dma_enable_memory_increment_mode(DMA2, DMA_STREAM0);
     dma_set_peripheral_size(DMA2, DMA_STREAM0, DMA_SxCR_PSIZE_16BIT);
     dma_set_memory_size(DMA2, DMA_STREAM0, DMA_SxCR_MSIZE_16BIT);
-    dma_set_priority(DMA2, DMA_STREAM0, DMA_SxCR_PL_VERY_HIGH);
+    dma_set_priority(DMA2, DMA_STREAM0, DMA_SxCR_PL_HIGH);
     dma_enable_circular_mode(DMA2, DMA_STREAM0);
     dma_channel_select(DMA2, DMA_STREAM0, DMA_SxCR_CHSEL_0);
     dma_set_peripheral_burst(DMA2, DMA_STREAM0, DMA_SxCR_PBURST_SINGLE);
@@ -269,11 +270,24 @@ void dma_setup()
 
     dma_enable_transfer_complete_interrupt(DMA2, DMA_STREAM0);
 
-    DMA_SCR(DMA2, DMA_STREAM0) |= DMA_SxCR_TEIE | DMA_SxCR_DMEIE;
-
     nvic_set_priority(NVIC_DMA2_STREAM0_IRQ, 3);
     nvic_enable_irq(NVIC_DMA2_STREAM0_IRQ);
     dma_enable_stream(DMA2, DMA_STREAM0);
+
+    // Memory to memory dma
+    dma_stream_reset(DMA2, DMA_STREAM1);
+    dma_set_transfer_mode(DMA2, DMA_STREAM1, DMA_SxCR_DIR_MEM_TO_MEM);
+    dma_set_priority(DMA2, DMA_STREAM1, DMA_SxCR_PL_VERY_HIGH);
+    dma_set_peripheral_size(DMA2, DMA_STREAM1, DMA_SxCR_PSIZE_32BIT);
+    dma_set_memory_size(DMA2, DMA_STREAM1, DMA_SxCR_MSIZE_32BIT);
+    dma_enable_memory_increment_mode(DMA2, DMA_STREAM1);
+    dma_enable_peripheral_increment_mode(DMA2, DMA_STREAM1);
+    dma_set_peripheral_address(DMA2, DMA_STREAM1, dbuf0);
+    dma_set_number_of_data(DMA2, DMA_STREAM1, DATA_BUF_LONGLEN);
+
+    dma_enable_transfer_complete_interrupt(DMA2, DMA_STREAM1);
+    nvic_set_priority(NVIC_DMA2_STREAM1_IRQ, 4);
+    nvic_enable_irq(NVIC_DMA2_STREAM1_IRQ);
 }
 
 void timer_setup()
@@ -283,12 +297,12 @@ void timer_setup()
 	timer_reset(TIM2);
 	timer_set_mode(TIM2, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
 	timer_set_period(TIM2, 100);
-	timer_set_prescaler(TIM2, 0);
+	timer_set_prescaler(TIM2, 100);
 	timer_set_clock_division(TIM2, TIM_CR1_CKD_CK_INT);
 	timer_set_master_mode(TIM2, TIM_CR2_MMS_UPDATE);
 
-	// nvic_set_priority(NVIC_ADC_IRQ, 0);
-    // nvic_enable_irq(NVIC_ADC_IRQ);
+	nvic_set_priority(NVIC_ADC_IRQ, 0);
+    nvic_enable_irq(NVIC_ADC_IRQ);
 }
 
 void adc_setup()
@@ -303,7 +317,7 @@ void adc_setup()
 	u8 channels[] = {ADC_CHANNEL1};
 	adc_set_regular_sequence(ADC1, 1, channels);
 
-//	adc_enable_eoc_interrupt(ADC1);
+	// adc_enable_eoc_interrupt(ADC1);
 
 	adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
 
@@ -356,38 +370,45 @@ int main(void)
 
 
 
-void adc_isr()
-{
-	short s;
-    char buf[64];
+// void adc_isr()
+// {
+// 	short s;
+//     char buf[64];
 
-    if(!running)
-        return;
-	ADC_SR(ADC1) &= ~ADC_SR_EOC;
-	s = adc_read_regular(ADC1);
-	while(usbd_ep_write_packet(usbd_dev, 0x81, &s, 2)==0 && running == 1);// usbd_poll(usbd_dev);
+//     if(!running)
+//         return;
+// 	ADC_SR(ADC1) &= ~ADC_SR_EOC;
+// 	s = adc_read_regular(ADC1);
+// 	while(usbd_ep_write_packet(usbd_dev, 0x81, &s, 2)==0 && running == 1);// usbd_poll(usbd_dev);
 //	while(usbd_ep_write_packet(usbd_dev, 0x81, buf, 64)==0 && running == 1);// usbd_poll(usbd_dev);
 //	s = timer_get_counter(TIM2);
 //	while(usbd_ep_write_packet(usbd_dev, 0x81, &s, 2)==0 && running == 1) usbd_poll(usbd_dev);
-}
+// }
 
 void dma2_stream0_isr()
 {
+
     if((DMA2_LISR & DMA_LISR_TCIF0) != 0)
     {
         dma_clear_interrupt_flags(DMA2, DMA_STREAM0, DMA_LISR_TCIF0);
         // memcpy(&data_bufs[cur_buf].data.asBytes, dbuf0, DATA_BUF_BYTELEN);
         data_bufs[cur_buf].status = 1;
-		while(usbd_ep_write_packet(usbd_dev, 0x81, dbuf0, DATA_BUF_BYTELEN)==0 && running == 1);// usbd_poll(usbd_dev);
+        dma_set_memory_address(DMA2, DMA_STREAM1, &data_bufs[cur_buf].data.asBytes);
+
+        dma_enable_transfer_complete_interrupt(DMA2, DMA_STREAM1);
+        dma_enable_stream(DMA2, DMA_STREAM1);
+		// while(usbd_ep_write_packet(usbd_dev, 0x81, dbuf0, DATA_BUF_BYTELEN)==0 && running == 1);// usbd_poll(usbd_dev);
     }
-    else if((DMA2_LISR & DMA_LISR_TEIF0) != 0)
-    	while(1);
-   	else if((DMA2_LISR & DMA_LISR_HTIF0) != 0)
-   		while(1);
-    else if((DMA2_LISR & DMA_LISR_DMEIF0) != 0)
-   		while(1);
-    else if((DMA2_LISR & DMA_LISR_FEIF0) != 0)
-   		while(1);
+}
+
+void dma2_stream1_isr()
+{
+    if((DMA2_LISR & DMA_LISR_TCIF1) != 0)
+    {
+        dma_clear_interrupt_flags(DMA2, DMA_STREAM1, DMA_LISR_TCIF1);
+        dma_disable_stream(DMA2, DMA_STREAM1);
+        while(usbd_ep_write_packet(usbd_dev, 0x81, data_bufs[cur_buf].data.asBytes, DATA_BUF_BYTELEN)==0 && running == 1);
+    }
 }
 
 void exit(int a)
