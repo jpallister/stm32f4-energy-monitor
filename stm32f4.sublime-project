@@ -3,6 +3,9 @@
 	[
 		{
 			"path": "/home/james/university/phd/stm32f4"
+		},
+		{
+			"path": "/home/james/tools/libopencm3"
 		}
 	]
 }

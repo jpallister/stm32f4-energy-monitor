@@ -1,245 +1,396 @@
-#include "stm32f4xx.h"
-#include "stm32f4xx_rcc.h"
-#include "stm32f4xx_gpio.h"
-#include "stm32f4xx_adc.h"
-#include "stm32f4xx_tim.h"
-#include "stm32f4xx_dma.h"
-#include "misc.h"
+/*
+ * This file is part of the libopencm3 project.
+ *
+ * Copyright (C) 2010 Gareth McMullin <gareth@blacksphere.co.nz>
+ *
+ * This library is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this library.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
-// Max number of shorts in conversion buffer
-#define CONV_BUF_SIZE   2048
+#include <stdlib.h>
+#include <libopencm3/stm32/f4/rcc.h>
+#include <libopencm3/stm32/f4/gpio.h>
+#include <libopencm3/stm32/f4/adc.h>
+#include <libopencm3/stm32/timer.h>
+#include <libopencm3/usb/usbd.h>
+#include <libopencm3/usb/cdc.h>
+#include <libopencm3/cm3/scb.h>
+#include <libopencm3/cm3/nvic.h>
+#include <libopencm3/stm32/f4/dma.h>
 
-// Patterns
-#define PATTERN_15C_1V  0
-#define PATTERN_8C_8V   1
+// USB Code
+
+static const struct usb_device_descriptor dev = {
+	.bLength = USB_DT_DEVICE_SIZE,
+	.bDescriptorType = USB_DT_DEVICE,
+	.bcdUSB = 0x0200,
+	.bDeviceClass = 0,
+	.bDeviceSubClass = 0,
+	.bDeviceProtocol = 0,
+	.bMaxPacketSize0 = 64,
+	.idVendor = 0x1337,
+	.idProduct = 0x1337,
+	.bcdDevice = 0x0200,
+	.iManufacturer = 1,
+	.iProduct = 2,
+	.iSerialNumber = 3,
+	.bNumConfigurations = 1,
+};
+
+
+static const struct usb_endpoint_descriptor data_endp[] = {{
+	.bLength = USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType = USB_DT_ENDPOINT,
+	.bEndpointAddress = 0x81,
+	.bmAttributes = USB_ENDPOINT_ATTR_BULK,
+	.wMaxPacketSize = 64,
+	.bInterval = 0,
+}, {
+	.bLength = USB_DT_ENDPOINT_SIZE,
+	.bDescriptorType = USB_DT_ENDPOINT,
+	.bEndpointAddress = 0x01,
+	.bmAttributes = USB_ENDPOINT_ATTR_BULK,
+	.wMaxPacketSize = 64,
+	.bInterval = 0,
+}};
+
+static const struct {
+	struct usb_cdc_header_descriptor header;
+	struct usb_cdc_call_management_descriptor call_mgmt;
+	struct usb_cdc_acm_descriptor acm;
+	struct usb_cdc_union_descriptor cdc_union;
+} __attribute__((packed)) cdcacm_functional_descriptors = {
+	.header = {
+		.bFunctionLength = sizeof(struct usb_cdc_header_descriptor),
+		.bDescriptorType = CS_INTERFACE,
+		.bDescriptorSubtype = USB_CDC_TYPE_HEADER,
+		.bcdCDC = 0x0110,
+	},
+	.call_mgmt = {
+		.bFunctionLength =
+			sizeof(struct usb_cdc_call_management_descriptor),
+		.bDescriptorType = CS_INTERFACE,
+		.bDescriptorSubtype = USB_CDC_TYPE_CALL_MANAGEMENT,
+		.bmCapabilities = 3,
+		.bDataInterface = 1,
+	},
+	.acm = {
+		.bFunctionLength = sizeof(struct usb_cdc_acm_descriptor),
+		.bDescriptorType = CS_INTERFACE,
+		.bDescriptorSubtype = USB_CDC_TYPE_ACM,
+		.bmCapabilities = 6,
+	},
+	.cdc_union = {
+		.bFunctionLength = sizeof(struct usb_cdc_union_descriptor),
+		.bDescriptorType = CS_INTERFACE,
+		.bDescriptorSubtype = USB_CDC_TYPE_UNION,
+		.bControlInterface = 0,
+		.bSubordinateInterface0 = 1,
+	 }
+};
+
+static const struct usb_interface_descriptor data_iface[] = {{
+	.bLength = USB_DT_INTERFACE_SIZE,
+	.bDescriptorType = USB_DT_INTERFACE,
+	.bInterfaceNumber = 0,
+	.bAlternateSetting = 0,
+	.bNumEndpoints = 2,
+	.bInterfaceClass = 0xFF,
+	.bInterfaceSubClass = 0,
+    .bInterfaceProtocol = 0,
+	.iInterface = 2,
+
+	.endpoint = data_endp,
+}};
+
+static const struct usb_interface ifaces[] = {{
+	.num_altsetting = 1,
+	.altsetting = data_iface,
+}};
+
+static const struct usb_config_descriptor config = {
+	.bLength = USB_DT_CONFIGURATION_SIZE,
+	.bDescriptorType = USB_DT_CONFIGURATION,
+	.wTotalLength = 0,
+	.bNumInterfaces = 1,
+	.bConfigurationValue = 1,
+	.iConfiguration = 0,
+	.bmAttributes = 0x80,
+	.bMaxPower = 0x32,
+
+	.interface = ifaces,
+};
+
+static const char *usb_strings[] = {
+	"James Pallister",
+	"Medium speed energy monitor",
+	"JP",
+};
+
+static int cdcacm_control_request(usbd_device *usbd_dev, struct usb_setup_data *req, u8 **buf,
+		u16 *len, void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
+{
+	(void)complete;
+	(void)buf;
+	(void)usbd_dev;
+
+	switch (req->bRequest) {
+	case 0:
+	case 3:
+	case 4:
+		return 1;
+	case 29:
+		return 1;
+	case USB_CDC_REQ_SET_CONTROL_LINE_STATE: {
+		/*
+		 * This Linux cdc_acm driver requires this to be implemented
+		 * even though it's optional in the CDC spec, and we don't
+		 * advertise it in the ACM functional descriptor.
+		 */
+         buf[8] = 0;
+         buf[9] = 0;
+		return 1;
+		}
+	case USB_CDC_REQ_SET_LINE_CODING:
+		if (*len < sizeof(struct usb_cdc_line_coding))
+			return 0;
+
+		return 1;
+    default:
+        return 0;
+	}
+	return 0;
+}
+
+int running = 0;
+
+static void cdcacm_data_rx_cb(usbd_device *usbd_dev, u8 ep)
+{
+	(void)ep;
+
+	char buf[64];
+	int len = usbd_ep_read_packet(usbd_dev, 0x01, buf, 64);
+	int i;
+
+    for(i = 0; i < len; ++i)
+    {
+        if(buf[i] == 'S')
+        {
+            running = 1;
+			timer_enable_counter(TIM2);
+        	adc_power_on(ADC1);
+        }
+        if(buf[i] == 'F')
+        {
+            running = 0;
+			timer_disable_counter(TIM2);
+        	adc_off(ADC1);
+        }
+    }
+
+	gpio_toggle(GPIOD, GPIO15);
+}
+
+
+static void usb_reset_cb()
+{
+    running = 0;
+}
+
+static void cdcacm_set_config(usbd_device *usbd_dev, u16 wValue)
+{
+	(void)wValue;
+
+	usbd_ep_setup(usbd_dev, 0x01, USB_ENDPOINT_ATTR_BULK, 64, cdcacm_data_rx_cb);
+	usbd_ep_setup(usbd_dev, 0x81, USB_ENDPOINT_ATTR_BULK, 64, NULL);
+
+	// usbd_register_control_callback(
+	// 			usbd_dev,
+	// 			USB_REQ_TYPE_CLASS | USB_REQ_TYPE_INTERFACE,
+	// 			USB_REQ_TYPE_TYPE | USB_REQ_TYPE_RECIPIENT,
+	// 			cdcacm_control_request);
+	usbd_register_control_callback(
+				usbd_dev,
+				USB_REQ_TYPE_VENDOR | USB_REQ_TYPE_INTERFACE,
+				USB_REQ_TYPE_TYPE | USB_REQ_TYPE_RECIPIENT,
+				cdcacm_control_request);
+
+    usbd_register_reset_callback(usbd_dev, usb_reset_cb);
+}
+
+// Data structs
+
+#define DATA_BUF_BYTELEN    64
+#define DATA_BUF_SHORTLEN    (DATA_BUF_BYTELEN/2)
+#define NUM_BUFFERS         8
 
 typedef struct {
-    unsigned short tstep;                   // Number of ticks per sample
-    unsigned long timestamp;                // Timestamp for beginning
-    unsigned short data[CONV_BUF_SIZE];     // The data
-    unsigned char  filled;                  // Whether this slot is filled
-    unsigned char  input;                   // Which ADC this came from
-} ADC_Data;
+    int rate;
+    int status; // 0=Empty, 1=filled, 2=compressed, 3=busy
+    union {
+        short asShorts[DATA_BUF_SHORTLEN];
+        unsigned char asBytes[DATA_BUF_BYTELEN];
+    } data;
+} power_data;
 
-ADC_Data data_bufs[8] = {0};
+power_data data_bufs[NUM_BUFFERS];
+
+short dbuf0[DATA_BUF_SHORTLEN];
 int cur_buf = 0;
 
-unsigned short ADC1_data0[CONV_BUF_SIZE];     // The data for ADC1
-unsigned short ADC1_data1[CONV_BUF_SIZE];     // The data for ADC1
 
-unsigned long dma_count = 0;
-unsigned long tm_count = 0;
-unsigned long last_tm_count = 0;
-
-void DMA2_Stream0_IRQHandler()
+void dma_setup()
 {
-    if(DMA_GetITStatus(DMA2_Stream0, DMA_IT_TCIF0) != RESET)
+    dma_stream_reset(DMA2, DMA_STREAM0);
+
+
+    dma_set_peripheral_address(DMA2, DMA_STREAM0, (u32)&ADC1_DR);
+    dma_set_memory_address(DMA2, DMA_STREAM0, (u32)dbuf0);
+    dma_set_number_of_data(DMA2, DMA_STREAM0, DATA_BUF_SHORTLEN);
+    dma_set_transfer_mode(DMA2, DMA_STREAM0, DMA_SxCR_DIR_PERIPHERAL_TO_MEM);
+    dma_enable_memory_increment_mode(DMA2, DMA_STREAM0);
+    dma_set_peripheral_size(DMA2, DMA_STREAM0, DMA_SxCR_PSIZE_16BIT);
+    dma_set_memory_size(DMA2, DMA_STREAM0, DMA_SxCR_MSIZE_16BIT);
+    dma_set_priority(DMA2, DMA_STREAM0, DMA_SxCR_PL_VERY_HIGH);
+    dma_enable_circular_mode(DMA2, DMA_STREAM0);
+    dma_channel_select(DMA2, DMA_STREAM0, DMA_SxCR_CHSEL_0);
+    dma_set_peripheral_burst(DMA2, DMA_STREAM0, DMA_SxCR_PBURST_SINGLE);
+    dma_set_memory_burst(DMA2, DMA_STREAM0, DMA_SxCR_MBURST_SINGLE);
+
+    dma_enable_transfer_complete_interrupt(DMA2, DMA_STREAM0);
+
+    DMA_SCR(DMA2, DMA_STREAM0) |= DMA_SxCR_TEIE | DMA_SxCR_DMEIE;
+
+    nvic_set_priority(NVIC_DMA2_STREAM0_IRQ, 3);
+    nvic_enable_irq(NVIC_DMA2_STREAM0_IRQ);
+    dma_enable_stream(DMA2, DMA_STREAM0);
+}
+
+void timer_setup()
+{
+	rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_TIM2EN);
+
+	timer_reset(TIM2);
+	timer_set_mode(TIM2, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
+	timer_set_period(TIM2, 100);
+	timer_set_prescaler(TIM2, 0);
+	timer_set_clock_division(TIM2, TIM_CR1_CKD_CK_INT);
+	timer_set_master_mode(TIM2, TIM_CR2_MMS_UPDATE);
+
+	// nvic_set_priority(NVIC_ADC_IRQ, 0);
+    // nvic_enable_irq(NVIC_ADC_IRQ);
+}
+
+void adc_setup()
+{
+	gpio_mode_setup(GPIOA, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO1);
+	rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_ADC1EN);
+	adc_set_clk_prescale(0);
+	adc_disable_scan_mode(ADC1);
+	adc_set_single_conversion_mode(ADC1);
+	adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR1_SMP_1DOT5CYC);
+
+	u8 channels[] = {ADC_CHANNEL1};
+	adc_set_regular_sequence(ADC1, 1, channels);
+
+//	adc_enable_eoc_interrupt(ADC1);
+
+	adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
+
+    adc_enable_dma(ADC1);
+    adc_set_dma_continue(ADC1);
+    ADC_CCR |= ADC_CCR_DMA_MODE_1;
+
+	adc_set_right_aligned(ADC1);
+	adc_set_multi_mode(ADC_CCR_MULTI_INDEPENDENT);
+	adc_power_on(ADC1);
+}
+
+usbd_device *usbd_dev;
+
+
+int main(void)
+{
+	int c_started=0, n;
+	short s;
+
+	rcc_clock_setup_hse_3v3(&hse_8mhz_3v3[CLOCK_3V3_168MHZ]);
+
+	rcc_peripheral_enable_clock(&RCC_AHB1ENR, RCC_AHB1ENR_DMA2EN);
+	rcc_peripheral_enable_clock(&RCC_AHB1ENR, RCC_AHB1ENR_IOPAEN);
+	rcc_peripheral_enable_clock(&RCC_AHB1ENR, RCC_AHB1ENR_IOPDEN);
+	rcc_peripheral_enable_clock(&RCC_AHB2ENR, RCC_AHB2ENR_OTGFSEN);
+
+	gpio_mode_setup(GPIOA, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO0);
+	gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9 | GPIO11 | GPIO12);
+	gpio_mode_setup(GPIOD, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO15 | GPIO14);
+	gpio_set_af(GPIOA, GPIO_AF10, GPIO9 | GPIO11 | GPIO12);
+
+    dma_setup();
+	adc_setup();
+	timer_setup();
+
+	gpio_toggle(GPIOA, GPIO12);
+
+	gpio_toggle(GPIOD, GPIO15);
+
+
+	usbd_dev = usbd_init(&otgfs_usb_driver, &dev, &config, usb_strings, 3);
+	usbd_register_set_config_callback(usbd_dev, cdcacm_set_config);
+
+	while (1)
+	{
+		usbd_poll(usbd_dev);
+	}
+}
+
+
+
+void adc_isr()
+{
+	short s;
+    char buf[64];
+
+    if(!running)
+        return;
+	ADC_SR(ADC1) &= ~ADC_SR_EOC;
+	s = adc_read_regular(ADC1);
+	while(usbd_ep_write_packet(usbd_dev, 0x81, &s, 2)==0 && running == 1);// usbd_poll(usbd_dev);
+//	while(usbd_ep_write_packet(usbd_dev, 0x81, buf, 64)==0 && running == 1);// usbd_poll(usbd_dev);
+//	s = timer_get_counter(TIM2);
+//	while(usbd_ep_write_packet(usbd_dev, 0x81, &s, 2)==0 && running == 1) usbd_poll(usbd_dev);
+}
+
+void dma2_stream0_isr()
+{
+    if((DMA2_LISR & DMA_LISR_TCIF0) != 0)
     {
-        DMA_ClearITPendingBit(DMA2_Stream0, DMA_IT_TCIF0);
-        memcpy(&data_bufs[cur_buf], ADC1_data0, sizeof(unsigned short)*CONV_BUF_SIZE);
-        data_bufs[cur_buf].filled = 1;
-        DMA_ClearFlag(DMA2_Stream0, DMA_FLAG_TCIF0);
-
-        dma_count = (dma_count + 1) & ((1 << 8)-1);
-        if(dma_count == 0)
-            GPIO_ToggleBits(GPIOD, GPIO_Pin_12);
-        data_bufs[cur_buf].timestamp = last_tm_count;
-
-        last_tm_count = tm_count;
-        cur_buf = (cur_buf + 1) & 7;
+        dma_clear_interrupt_flags(DMA2, DMA_STREAM0, DMA_LISR_TCIF0);
+        // memcpy(&data_bufs[cur_buf].data.asBytes, dbuf0, DATA_BUF_BYTELEN);
+        data_bufs[cur_buf].status = 1;
+		while(usbd_ep_write_packet(usbd_dev, 0x81, dbuf0, DATA_BUF_BYTELEN)==0 && running == 1);// usbd_poll(usbd_dev);
     }
+    else if((DMA2_LISR & DMA_LISR_TEIF0) != 0)
+    	while(1);
+   	else if((DMA2_LISR & DMA_LISR_HTIF0) != 0)
+   		while(1);
+    else if((DMA2_LISR & DMA_LISR_DMEIF0) != 0)
+   		while(1);
+    else if((DMA2_LISR & DMA_LISR_FEIF0) != 0)
+   		while(1);
 }
 
-
-void TIM2_IRQHandler()
+void exit(int a)
 {
-    TIM_ClearITPendingBit(TIM2, TIM_IT_CC2);
-    tm_count = (tm_count + 1) & ((1 << 18)-1);
-    if(tm_count == 0)
-        GPIO_ToggleBits(GPIOD, GPIO_Pin_13);
-
-    ADC_SoftwareStartConv(ADC1);
-}
-
-
-int main()
-{
-    int i;
-
-    ADC_CommonInitTypeDef ADC_CommonInitStructure;
-    ADC_InitTypeDef       ADC_InitStructure;
-    GPIO_InitTypeDef  GPIOD_InitStructure, GPIOA_InitStructure;
-    DMA_InitTypeDef DMA_InitStructure;
-    NVIC_InitTypeDef NVIC_InitStructure;
-    TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
-    TIM_OCInitTypeDef TIM_OCInitStructure;
-
-    __disable_irq();
-
-    // RESET STUFF
-    DMA_DeInit(DMA2_Stream0);
-    ADC_DeInit();
-    TIM_DeInit(TIM2);
-    GPIO_DeInit(GPIOA);
-    GPIO_DeInit(GPIOD);
-
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA2, ENABLE);
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
-
-    /* Configure PD12, PD13, PD14 and PD15 in output pushpull mode */
-    GPIOD_InitStructure.GPIO_Pin = GPIO_Pin_12 | GPIO_Pin_13| GPIO_Pin_14| GPIO_Pin_15;
-    GPIOD_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-    GPIOD_InitStructure.GPIO_OType = GPIO_OType_PP;
-    GPIOD_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-    GPIOD_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-    GPIO_Init(GPIOD, &GPIOD_InitStructure);
-
-    GPIO_Write(GPIOD, GPIO_Pin_12);
-    for(i = 0; i < 1000000; ++i);
-    GPIO_Write(GPIOD, GPIO_Pin_13);
-    for(i = 0; i < 1000000; ++i);
-    GPIO_Write(GPIOD, GPIO_Pin_14);
-    for(i = 0; i < 1000000; ++i);
-    GPIO_Write(GPIOD, GPIO_Pin_15);
-    for(i = 0; i < 1000000; ++i);
-    GPIO_Write(GPIOD, GPIO_Pin_14);
-    for(i = 0; i < 1000000; ++i);
-    GPIO_Write(GPIOD, GPIO_Pin_13);
-    for(i = 0; i < 1000000; ++i);
-    GPIO_Write(GPIOD, 0);
-
-    // Set up analog inputs
-    GPIOA_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1;
-    GPIOA_InitStructure.GPIO_Mode = GPIO_Mode_AN;
-    GPIOA_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL ;
-    GPIO_Init(GPIOA, &GPIOA_InitStructure);
-
-     /* Configure and enable DMA interrupt */
-    NVIC_InitStructure.NVIC_IRQChannel = DMA2_Stream0_IRQn;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 14;
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
-    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-    NVIC_Init(&NVIC_InitStructure);
-
-    NVIC_InitStructure.NVIC_IRQChannel = TIM2_IRQn;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 13;
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
-    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-    NVIC_Init(&NVIC_InitStructure);
-
-    // Set up DMA
-    DMA_InitStructure.DMA_Channel = DMA_Channel_0;
-    DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)&ADC1_data0;
-    DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&ADC1->DR;
-    DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralToMemory;
-    DMA_InitStructure.DMA_BufferSize = CONV_BUF_SIZE;
-    DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
-    DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
-    DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
-    DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;
-    DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;
-    DMA_InitStructure.DMA_Priority = DMA_Priority_High;
-    DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Disable;
-    DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_3QuartersFull;
-    // DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_HalfFull;
-    DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single;
-    DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
-    DMA_Init(DMA2_Stream0, &DMA_InitStructure);
-    DMA_ITConfig(DMA2_Stream0, DMA_IT_TC, ENABLE);
-    DMA_Cmd(DMA2_Stream0, ENABLE);
-
-    TIM_TimeBaseStructInit(&TIM_TimeBaseStructure);
-    TIM_TimeBaseStructure.TIM_Period = 100; //~280kHz
-    TIM_TimeBaseStructure.TIM_Period = 115; //~250kHz
-    TIM_TimeBaseStructure.TIM_Period = 230; //~125kHz
-    // TIM_TimeBaseStructure.TIM_Period = 400; //~70kHz trigger
-    // TIM_TimeBaseStructure.TIM_Period = 15; //~2MHz trigger
-    // TIM_TimeBaseStructure.TIM_Period = 30; //~1MHz trigger
-    TIM_TimeBaseStructure.TIM_Period = 101; //~0.5MHz trigger
-    TIM_TimeBaseStructure.TIM_Prescaler = 0;//(uint16_t) ((SystemCoreClock / 2) / 720000000) - 1;
-    TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
-    TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
-    TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
-    TIM_OC2PreloadConfig(TIM2, TIM_OCPreload_Disable);
-
-    TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_Toggle;
-    TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
-    TIM_OCInitStructure.TIM_Pulse = 1000 ;
-    TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_Low;
-    TIM_OC2Init(TIM2, &TIM_OCInitStructure);
-    TIM_ITConfig(TIM2, TIM_IT_CC2, ENABLE);
-
-    ADC_CommonInitStructure.ADC_Mode = ADC_Mode_Independent;
-    ADC_CommonInitStructure.ADC_Prescaler = ADC_Prescaler_Div2;
-    ADC_CommonInitStructure.ADC_DMAAccessMode = ADC_DMAAccessMode_1;
-    ADC_CommonInitStructure.ADC_TwoSamplingDelay = ADC_TwoSamplingDelay_5Cycles;
-    ADC_CommonInit(&ADC_CommonInitStructure);
-
-    ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
-    ADC_InitStructure.ADC_ScanConvMode = ENABLE;
-    ADC_InitStructure.ADC_ContinuousConvMode = DISABLE;
-    // ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_Rising;
-    ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
-    // ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T2_TRGO;
-    ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Left;
-    ADC_InitStructure.ADC_NbrOfConversion = 2;
-    ADC_Init(ADC1, &ADC_InitStructure);
-
-    // ADC_DiscModeChannelCountConfig(ADC1, 1);
-    // ADC_DiscModeCmd(ADC1, ENABLE);
-
-    ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 1, ADC_SampleTime_3Cycles);
-    ADC_RegularChannelConfig(ADC1, ADC_Channel_1, 2, ADC_SampleTime_3Cycles);
-    // ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 3, ADC_SampleTime_3Cycles);
-    // ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 4, ADC_SampleTime_3Cycles);
-    // ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 5, ADC_SampleTime_3Cycles);
-    // ADC_RegularChannelConfig(ADC1, ADC_Channel_1, 6, ADC_SampleTime_3Cycles);
-    // ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 7, ADC_SampleTime_3Cycles);
-    // ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 8, ADC_SampleTime_3Cycles);
-    // ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 9, ADC_SampleTime_3Cycles);
-    // ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 10, ADC_SampleTime_3Cycles);
-    // ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 11, ADC_SampleTime_3Cycles);
-    // ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 12, ADC_SampleTime_3Cycles);
-    // ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 13, ADC_SampleTime_3Cycles);
-    // ADC_RegularChannelConfig(ADC1, ADC_Channel_1, 14, ADC_SampleTime_3Cycles);
-    // ADC_RegularChannelConfig(ADC1, ADC_Channel_1, 15, ADC_SampleTime_3Cycles);
-    // ADC_RegularChannelConfig(ADC1, ADC_Channel_1, 16, ADC_SampleTime_3Cycles);
-
-    ADC_DMARequestAfterLastTransferCmd(ADC1, ENABLE);
-
-    ADC_Cmd(ADC1, ENABLE);
-    ADC_DMACmd(ADC1, ENABLE);
-
-    __enable_irq();
-
-    TIM_Cmd(TIM2, ENABLE);
-
-    /* PD12 to be toggled */
-    while(1);
-    {
-
-        // while(ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET);
-
-        // i = ADC_GetConversionValue(ADC1);
-
-        // GPIO_Write(GPIOD, GPIO_Pin_13);
-        // for(i = 0; i < 1000000; ++i);
-        // GPIO_Write(GPIOD, GPIO_Pin_14);
-        // for(i = 0; i < 1000000; ++i);
-        GPIO_Write(GPIOD, GPIO_Pin_15);
-        for(i = 0; i < 1000000; ++i);
-        GPIO_Write(GPIOD, GPIO_Pin_14);
-        for(i = 0; i < 1000000; ++i);
-
-        // ADC_SoftwareStartConv(ADC1);
-    }
-}
-
-
-void exit()
-{
-    while(1);
+	while(1);
 }

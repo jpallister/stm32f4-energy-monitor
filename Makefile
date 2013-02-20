@@ -1,12 +1,17 @@
+CC=~/sat_toolchain/bin/arm-none-eabi-gcc
 
-CC=~/arm_cortex-m4_toolchain/bin/arm-none-eabi-gcc
-SRC=energy_monitor.c
-LIB_SRC=std_lib/src/stm32f4xx_gpio.c std_lib/src/stm32f4xx_rcc.c std_lib/src/stm32f4xx_adc.c std_lib/src/stm32f4xx_dma.c std_lib/src/misc.c std_lib/src/stm32f4xx_tim.c
-CFLAGS=-mfloat-abi=hard -mfpu=vfpv3-d16 -mcpu=cortex-m4 -mhard-float -g
-IDIRS= -Iinclude -Istd_lib/inc
-LSCR= -T src/stm32_flash.ld
-PSRC= src/system_stm32f4xx.c src/startup_stm32f4xx.s
-# CFLAGS=
+FLAGS += -T libopencm3_stm32f4.ld
+
+FLAGS += -D STM32F4
+FLAGS += -g -fno-common
+FLAGS += -mcpu=cortex-m4 -mthumb
+FLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
+
+SRC += energy_monitor.c
 
 all:
-	$(CC) $(CFLAGS) $(IDIRS) $(LSCR) $(SRC) $(LIB_SRC) $(PSRC) -o energy_monitor
+	$(CC) $(FLAGS) $(SRC) -o energy_monitor -lopencm3_stm32f4
+
+
+recv: recv.c
+	gcc -o recv recv.c -lusb-1.0 -g
