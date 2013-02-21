@@ -2,7 +2,8 @@
 	"folders":
 	[
 		{
-			"path": "/home/james/university/phd/stm32f4"
+			"path": "/home/james/university/phd/stm32f4",
+            "file_exclude_patterns": ["recv", "energy_monitor"]
 		},
 		{
 			"path": "/home/james/tools/libopencm3"

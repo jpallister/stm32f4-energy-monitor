@@ -51,7 +51,7 @@ void access_device(libusb_device *dev)
 
 
     printf("Sending start\n");
-    buff[0] = 'S';    
+    buff[0] = 'S';
     libusb_bulk_transfer(devh, 0x1, buff, 1, &len, 0);
     printf("Transferring\n");
     for(;;)
@@ -66,9 +66,9 @@ void access_device(libusb_device *dev)
         {
             libusb_bulk_transfer(devh, 0x81, buf, 1024*sizeof(short), &len, 0);
             tot += len;
- //           for(i = 0; i < len/2;++i)
+           for(i = 0; i < len/2;++i)
                 //printf("%c%c", buf[i]&0xff, buf[i]>>8);
-   //             printf("%d\n", buf[i]);
+               printf("%d\n", buf[i]);
         }
         printf("\t===> %f bytes/s\n", tot/10.);
     }
