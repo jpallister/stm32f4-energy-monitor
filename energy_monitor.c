@@ -233,8 +233,11 @@ static void cdcacm_set_config(usbd_device *usbd_dev, u16 wValue)
 #define DATA_BUF_BYTELEN    64
 #define DATA_BUF_SHORTLEN    (DATA_BUF_BYTELEN/2)
 #define DATA_BUF_LONGLEN    (DATA_BUF_BYTELEN/4)
-#define NUM_BUFFERS         16
+#define NUM_BUFFERS         64
 #define NUM_BUFFERS_MASK    (NUM_BUFFERS-1)
+
+#define HIGH_THRESH         8
+#define LOW_THRESH          56
 
 typedef struct {
     int rate;
@@ -437,13 +440,13 @@ void dma2_stream0_isr()
         {
             int dif = (head_ptr+NUM_BUFFERS-tail_ptr) & NUM_BUFFERS_MASK;
 
-            if(dif <= 2)
+            if(dif < LOW_THRESH)
             {
                 if(tperiod > 100)
                     tperiod -= 1;
             	timer_set_period(TIM2, tperiod);
             }
-            if(dif >= 14)
+            if(dif > HIGH_THRESH)
             {
                 if(tperiod < 1000)
                     tperiod += 1;
