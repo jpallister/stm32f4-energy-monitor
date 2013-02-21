@@ -244,11 +244,11 @@ typedef struct {
     } data;
 } power_data;
 
-power_data data_bufs[NUM_BUFFERS];
+power_data data_bufs[NUM_BUFFERS] = {0};
 
 short dbuf0[DATA_BUF_SHORTLEN];
 short dbuf1[DATA_BUF_SHORTLEN];
-int cur_buf = 0;;
+int cur_buf = 0;
 
 
 void dma_setup()
@@ -333,9 +333,19 @@ void adc_setup()
 usbd_device *usbd_dev;
 
 
+int find_status(int status)
+{
+    int i;
+
+    for(i = 0; i < NUM_BUFFERS; ++i)
+        if(data_bufs[i].status == status)
+            return i;
+    return -1;
+}
+
 int main(void)
 {
-	int c_started=0, n;
+	int c_started=0, n, cpy;
 	short s;
 
 	rcc_clock_setup_hse_3v3(&hse_8mhz_3v3[CLOCK_3V3_168MHZ]);
@@ -365,6 +375,15 @@ int main(void)
 	while (1)
 	{
 		usbd_poll(usbd_dev);
+
+        cpy = find_status(1);
+
+        if(cpy == -1)
+            continue;
+
+		if(usbd_ep_write_packet(usbd_dev, 0x81, data_bufs[cpy].data.asBytes, DATA_BUF_BYTELEN) != 0)
+            data_bufs[cpy].status = 0;
+            
 	}
 }
 
@@ -390,14 +409,17 @@ void dma2_stream0_isr()
 
     if((DMA2_LISR & DMA_LISR_TCIF0) != 0)
     {
+        int cpy = find_status(0);
+        data_bufs[cpy].status = 1;
+        memcpy(data_bufs[cpy].data.asBytes, dbuf0, DATA_BUF_BYTELEN);
+
         dma_clear_interrupt_flags(DMA2, DMA_STREAM0, DMA_LISR_TCIF0);
         // memcpy(&data_bufs[cur_buf].data.asBytes, dbuf0, DATA_BUF_BYTELEN);
-        data_bufs[cur_buf].status = 1;
-        dma_set_memory_address(DMA2, DMA_STREAM1, &data_bufs[cur_buf].data.asBytes);
+        // dma_set_memory_address(DMA2, DMA_STREAM1, &data_bufs[cur_buf].data.asBytes);
 
-        dma_enable_transfer_complete_interrupt(DMA2, DMA_STREAM1);
-        dma_enable_stream(DMA2, DMA_STREAM1);
-		// while(usbd_ep_write_packet(usbd_dev, 0x81, dbuf0, DATA_BUF_BYTELEN)==0 && running == 1);// usbd_poll(usbd_dev);
+        // dma_enable_transfer_complete_interrupt(DMA2, DMA_STREAM1);
+        // dma_enable_stream(DMA2, DMA_STREAM1);
+	//	 while(usbd_ep_write_packet(usbd_dev, 0x81, dbuf0, DATA_BUF_BYTELEN)==0 && running == 1);// usbd_poll(usbd_dev);
     }
 }
 
