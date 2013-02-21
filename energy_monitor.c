@@ -233,7 +233,8 @@ static void cdcacm_set_config(usbd_device *usbd_dev, u16 wValue)
 #define DATA_BUF_BYTELEN    64
 #define DATA_BUF_SHORTLEN    (DATA_BUF_BYTELEN/2)
 #define DATA_BUF_LONGLEN    (DATA_BUF_BYTELEN/4)
-#define NUM_BUFFERS         8
+#define NUM_BUFFERS         16
+#define NUM_BUFFERS_MASK    (NUM_BUFFERS-1)
 
 typedef struct {
     int rate;
@@ -248,7 +249,7 @@ power_data data_bufs[NUM_BUFFERS] = {0};
 
 short dbuf0[DATA_BUF_SHORTLEN];
 short dbuf1[DATA_BUF_SHORTLEN];
-int cur_buf = 0;
+int head_ptr = 0, tail_ptr = 0;
 
 
 void dma_setup()
@@ -296,8 +297,8 @@ void timer_setup()
 
 	timer_reset(TIM2);
 	timer_set_mode(TIM2, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
-	timer_set_period(TIM2, 100);
-	timer_set_prescaler(TIM2, 100);
+	timer_set_period(TIM2, 150);
+	timer_set_prescaler(TIM2, 0);
 	timer_set_clock_division(TIM2, TIM_CR1_CKD_CK_INT);
 	timer_set_master_mode(TIM2, TIM_CR2_MMS_UPDATE);
 
@@ -376,14 +377,15 @@ int main(void)
 	{
 		usbd_poll(usbd_dev);
 
-        cpy = find_status(1);
-
-        if(cpy == -1)
+        if(head_ptr == tail_ptr)
             continue;
 
-		if(usbd_ep_write_packet(usbd_dev, 0x81, data_bufs[cpy].data.asBytes, DATA_BUF_BYTELEN) != 0)
-            data_bufs[cpy].status = 0;
-            
+		if(usbd_ep_write_packet(usbd_dev, 0x81, data_bufs[tail_ptr].data.asBytes, DATA_BUF_BYTELEN) != 0)
+        {
+            data_bufs[tail_ptr].status = 0;
+            tail_ptr = (tail_ptr+1) & NUM_BUFFERS_MASK;
+        }
+
 	}
 }
 
@@ -406,14 +408,20 @@ int main(void)
 
 void dma2_stream0_isr()
 {
+    int nhead;
 
     if((DMA2_LISR & DMA_LISR_TCIF0) != 0)
     {
-        int cpy = find_status(0);
-        data_bufs[cpy].status = 1;
-        memcpy(data_bufs[cpy].data.asBytes, dbuf0, DATA_BUF_BYTELEN);
-
         dma_clear_interrupt_flags(DMA2, DMA_STREAM0, DMA_LISR_TCIF0);
+
+        nhead = (head_ptr+1) & NUM_BUFFERS_MASK;
+        if(nhead == tail_ptr)
+            return;
+
+        head_ptr = nhead;
+        data_bufs[head_ptr].status = 1;
+        memcpy(data_bufs[head_ptr].data.asBytes, dbuf0, DATA_BUF_BYTELEN);
+
         // memcpy(&data_bufs[cur_buf].data.asBytes, dbuf0, DATA_BUF_BYTELEN);
         // dma_set_memory_address(DMA2, DMA_STREAM1, &data_bufs[cur_buf].data.asBytes);
 
@@ -429,7 +437,7 @@ void dma2_stream1_isr()
     {
         dma_clear_interrupt_flags(DMA2, DMA_STREAM1, DMA_LISR_TCIF1);
         dma_disable_stream(DMA2, DMA_STREAM1);
-        while(usbd_ep_write_packet(usbd_dev, 0x81, data_bufs[cur_buf].data.asBytes, DATA_BUF_BYTELEN)==0 && running == 1);
+        // while(usbd_ep_write_packet(usbd_dev, 0x81, data_bufs[cur_buf].data.asBytes, DATA_BUF_BYTELEN)==0 && running == 1);
     }
 }
 
