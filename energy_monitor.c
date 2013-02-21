@@ -251,6 +251,7 @@ short dbuf0[DATA_BUF_SHORTLEN];
 short dbuf1[DATA_BUF_SHORTLEN];
 int head_ptr = 0, tail_ptr = 0;
 
+int tperiod=200;
 
 void dma_setup()
 {
@@ -297,10 +298,11 @@ void timer_setup()
 
 	timer_reset(TIM2);
 	timer_set_mode(TIM2, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
-	timer_set_period(TIM2, 150);
+	timer_set_period(TIM2, tperiod);
 	timer_set_prescaler(TIM2, 0);
 	timer_set_clock_division(TIM2, TIM_CR1_CKD_CK_INT);
 	timer_set_master_mode(TIM2, TIM_CR2_MMS_UPDATE);
+    timer_enable_preload(TIM2);
 
 	nvic_set_priority(NVIC_ADC_IRQ, 0);
     nvic_enable_irq(NVIC_ADC_IRQ);
@@ -377,6 +379,7 @@ int main(void)
 	{
 		usbd_poll(usbd_dev);
 
+
         if(head_ptr == tail_ptr)
             continue;
 
@@ -385,7 +388,6 @@ int main(void)
             data_bufs[tail_ptr].status = 0;
             tail_ptr = (tail_ptr+1) & NUM_BUFFERS_MASK;
         }
-
 	}
 }
 
@@ -408,7 +410,7 @@ int main(void)
 
 void dma2_stream0_isr()
 {
-    int nhead;
+    int nhead,i;
 
     if((DMA2_LISR & DMA_LISR_TCIF0) != 0)
     {
@@ -420,7 +422,9 @@ void dma2_stream0_isr()
 
         head_ptr = nhead;
         data_bufs[head_ptr].status = 1;
-        memcpy(data_bufs[head_ptr].data.asBytes, dbuf0, DATA_BUF_BYTELEN);
+        //memcpy(data_bufs[head_ptr].data.asBytes, dbuf0, DATA_BUF_BYTELEN);
+        for(i = 0; i < DATA_BUF_SHORTLEN; ++i)
+            data_bufs[head_ptr].data.asShorts[i] = tperiod;
 
         // memcpy(&data_bufs[cur_buf].data.asBytes, dbuf0, DATA_BUF_BYTELEN);
         // dma_set_memory_address(DMA2, DMA_STREAM1, &data_bufs[cur_buf].data.asBytes);
@@ -429,6 +433,23 @@ void dma2_stream0_isr()
         // dma_enable_stream(DMA2, DMA_STREAM1);
 	//	 while(usbd_ep_write_packet(usbd_dev, 0x81, dbuf0, DATA_BUF_BYTELEN)==0 && running == 1);// usbd_poll(usbd_dev);
     }
+        if(running)
+        {
+            int dif = (head_ptr+NUM_BUFFERS-tail_ptr) & NUM_BUFFERS_MASK;
+
+            if(dif <= 2)
+            {
+                if(tperiod > 100)
+                    tperiod -= 1;
+            	timer_set_period(TIM2, tperiod);
+            }
+            if(dif >= 14)
+            {
+                if(tperiod < 1000)
+                    tperiod += 1;
+	            timer_set_period(TIM2, tperiod);
+            }
+        }
 }
 
 void dma2_stream1_isr()
