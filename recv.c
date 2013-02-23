@@ -32,8 +32,9 @@ void ctrlc(int signum)
 void access_device(libusb_device *dev)
 {
     int r, len=0;
-    int t1, t2, i, tot;
+    int t1, t2, i, tot, c=0;
     char buff[1];
+    FILE *out = fopen("out_results","w");
 
     r = libusb_open(dev, &devh);
     if(r < 0)
@@ -51,26 +52,59 @@ void access_device(libusb_device *dev)
 
 
     printf("Sending start\n");
-    buff[0] = 'S';    
+    buff[0] = 'S';
     libusb_bulk_transfer(devh, 0x1, buff, 1, &len, 0);
     printf("Transferring\n");
     for(;;)
     {
-        short buf[1024]={0};
+        unsigned char buf[2048*2]={0};
+        int cur_rate = 0, cur_time = 0;
+        short b1, b2;
+        int samp=0;
 
         t1 = time(0);
         tot = 0;
   //      printf("Starting measurement\n");
 
-        while(time(0) < t1 + 10)
+        while(time(0) < t1 + 2)
         {
-            libusb_bulk_transfer(devh, 0x81, buf, 1024*sizeof(short), &len, 0);
+            libusb_bulk_transfer(devh, 0x81, buf, 2048*2, &len, 0);
             tot += len;
- //           for(i = 0; i < len/2;++i)
+     //       continue;
+            //for(i = 0; i < len/2;++i)
                 //printf("%c%c", buf[i]&0xff, buf[i]>>8);
-   //             printf("%d\n", buf[i]);
+               // printf("%d\n", buf[i]);
+            for(i = 0; i < len; ++i, c = (c + 1) % 64)
+                if(c == 0)
+                {
+                    cur_rate = buf[i];
+     //               printf("%d\n", cur_rate);
+                }
+                else
+                {
+                    if((c-1)%3 == 0)
+                    {
+                        b1 = buf[i];
+                    }
+                    else if((c-1)%3 == 1)
+                    {
+                        b2 = buf[i];
+                    }
+                    else
+                    {
+                        b1 |= (buf[i]&0x0F)<<8;
+                        b2 |= (buf[i]&0xF0)<<4;
+                        fprintf(out, "%d %d\n",b1,cur_time);
+                        cur_time += cur_rate;
+                        fprintf(out, "%d %d\n",b2,cur_time);
+                        cur_time += cur_rate;
+                        samp += 2;
+                    }
+                }
+
+
         }
-        printf("\t===> %f bytes/s\n", tot/10.);
+        printf("\t===> %f bytes/s (%f samples/s)\n", tot/2., samp/2.);
     }
 
 
