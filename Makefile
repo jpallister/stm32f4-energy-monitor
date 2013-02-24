@@ -9,9 +9,12 @@ FLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 
 SRC += energy_monitor.c
 
-all:
+.PHONY: firmware hostapp all
+
+all: energy_monitor host_receiver
+
+energy_monitor: energy_monitor.c Makefile
 	$(CC) $(FLAGS) $(SRC) -o energy_monitor -lopencm3_stm32f4
 
-
-recv: recv.c
-	gcc -o recv recv.c -lusb-1.0 -g
+host_receiver: host/host_receiver.cpp host/libusbinterface.cpp host/dataprocessor.cpp Makefile
+	g++ -o host_receiver host/host_receiver.cpp host/libusbinterface.cpp host/dataprocessor.cpp -lboost_thread-mt -lusb-1.0 -g -O2
