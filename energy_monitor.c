@@ -63,7 +63,7 @@ static const struct usb_endpoint_descriptor data_endp[] = {{
 	.wMaxPacketSize = 64,
 	.bInterval = 0,
 }};
-
+/*
 static const struct {
 	struct usb_cdc_header_descriptor header;
 	struct usb_cdc_call_management_descriptor call_mgmt;
@@ -98,7 +98,7 @@ static const struct {
 		.bSubordinateInterface0 = 1,
 	 }
 };
-
+*/
 static const struct usb_interface_descriptor data_iface[] = {{
 	.bLength = USB_DT_INTERFACE_SIZE,
 	.bDescriptorType = USB_DT_INTERFACE,
@@ -144,10 +144,36 @@ static int cdcacm_control_request(usbd_device *usbd_dev, struct usb_setup_data *
 	(void)buf;
 	(void)usbd_dev;
 
+	switch (req->bRequest) {
+	case 0:
+	case 3:
+	case 4:
+		return 1;
+	case 29:
+		return 1;
+	case USB_CDC_REQ_SET_CONTROL_LINE_STATE: {
+		/*
+		 * This Linux cdc_acm driver requires this to be implemented
+		 * even though it's optional in the CDC spec, and we don't
+		 * advertise it in the ACM functional descriptor.
+		 */
+         buf[8] = 0;
+         buf[9] = 0;
+		return 1;
+		}
+	case USB_CDC_REQ_SET_LINE_CODING:
+		if (*len < sizeof(struct usb_cdc_line_coding))
+			return 0;
+
+		return 1;
+    default:
+        return 0;
+	}
 	return 0;
 }
 
 int running = 0;
+int head_ptr = 0, tail_ptr = 0;
 
 static void cdcacm_data_rx_cb(usbd_device *usbd_dev, u8 ep)
 {
@@ -162,6 +188,8 @@ static void cdcacm_data_rx_cb(usbd_device *usbd_dev, u8 ep)
         if(buf[i] == 'S')
         {
             running = 1;
+            head_ptr = 0;
+            tail_ptr = 0;
 			timer_enable_counter(TIM2);
         	adc_power_on(ADC1);
         }
@@ -205,32 +233,27 @@ static void cdcacm_set_config(usbd_device *usbd_dev, u16 wValue)
 
 // Data structs
 
-#define DATA_BUF_BYTELEN    64
-#define DATA_BUF_SHORTLEN    (DATA_BUF_BYTELEN/2)
-#define DATA_BUF_LONGLEN    (DATA_BUF_BYTELEN/4)
-#define NUM_BUFFERS         64
+#define DATA_BUF_BYTES      64
+#define DATA_BUF_SHORTS     42
+#define NUM_BUFFERS         2000
 #define NUM_BUFFERS_MASK    (NUM_BUFFERS-1)
 
-#define BUF_LOW_THRESH      8
-#define BUF_HIGH_THRESH     56
+#define HIGH_THRESH         64
+#define LOW_THRESH          960
 
 typedef struct {
-    int rate;
-    int status; // 0=Empty, 1=filled, 2=compressed, 3=busy
-    union {
-        short asShorts[DATA_BUF_SHORTLEN];
-        unsigned char asBytes[DATA_BUF_BYTELEN];
-    } data;
+    unsigned char data[DATA_BUF_BYTES];
 } power_data;
 
 power_data data_bufs[NUM_BUFFERS] = {0};
 
-short dbuf0[DATA_BUF_SHORTLEN];
-short dbuf1[DATA_BUF_SHORTLEN];
-int head_buf = 0,tail_buf = 0;
+short dbuf0[DATA_BUF_SHORTS];
+int sent_counter=0;
 
-int tperiod=600;
+//#define TPERIOD_INIT    800
+#define TPERIOD_INIT    1600
 
+int tperiod=TPERIOD_INIT;
 
 void dma_setup()
 {
@@ -238,7 +261,7 @@ void dma_setup()
 
     dma_set_peripheral_address(DMA2, DMA_STREAM0, (u32)&ADC1_DR);
     dma_set_memory_address(DMA2, DMA_STREAM0, (u32)&dbuf0);
-    dma_set_number_of_data(DMA2, DMA_STREAM0, DATA_BUF_SHORTLEN);
+    dma_set_number_of_data(DMA2, DMA_STREAM0, DATA_BUF_SHORTS);
     dma_set_transfer_mode(DMA2, DMA_STREAM0, DMA_SxCR_DIR_PERIPHERAL_TO_MEM);
     dma_enable_memory_increment_mode(DMA2, DMA_STREAM0);
     dma_set_peripheral_size(DMA2, DMA_STREAM0, DMA_SxCR_PSIZE_16BIT);
@@ -264,7 +287,7 @@ void dma_setup()
     // dma_enable_memory_increment_mode(DMA2, DMA_STREAM1);
     // dma_enable_peripheral_increment_mode(DMA2, DMA_STREAM1);
     // dma_set_peripheral_address(DMA2, DMA_STREAM1, dbuf0);
-    // dma_set_number_of_data(DMA2, DMA_STREAM1, DATA_BUF_LONGLEN);
+    // // dma_set_number_of_data(DMA2, DMA_STREAM1, DATA_BUF_LONGLEN);
 
     // dma_enable_transfer_complete_interrupt(DMA2, DMA_STREAM1);
     // nvic_set_priority(NVIC_DMA2_STREAM1_IRQ, 4);
@@ -274,29 +297,31 @@ void dma_setup()
 void timer_setup()
 {
 	rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_TIM2EN);
+	rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_TIM3EN);
+
 	timer_reset(TIM2);
 	timer_set_mode(TIM2, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
-    timer_enable_preload(TIM2);
-	timer_set_period(TIM2, tperiod);
-	timer_set_prescaler(TIM2, 2);
+	timer_set_period(TIM2, tperiod>>2);
+	timer_set_prescaler(TIM2, 0);
 	timer_set_clock_division(TIM2, TIM_CR1_CKD_CK_INT);
 	timer_set_master_mode(TIM2, TIM_CR2_MMS_UPDATE);
+    timer_enable_preload(TIM2);
 
-    rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_TIM3EN);
     timer_reset(TIM3);
-    timer_set_mode(TIM3, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
-    // timer_enable_preload(TIM3);
-    timer_set_period(TIM3, 1000);
-    timer_set_prescaler(TIM3, 1680);
-    timer_set_clock_division(TIM3, TIM_CR1_CKD_CK_INT);
-    timer_set_master_mode(TIM3, TIM_CR2_MMS_UPDATE);
-    timer_enable_irq(TIM3, TIM_DIER_TIE | TIM_DIER_UIE);
+	timer_set_mode(TIM3, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
+	timer_set_period(TIM3, 100);
+	timer_set_prescaler(TIM3, 168);
+	timer_set_clock_division(TIM3, TIM_CR1_CKD_CK_INT);
+	timer_set_master_mode(TIM3, TIM_CR2_MMS_UPDATE);
+    timer_enable_irq(TIM3, TIM_DIER_UIE);
 
-    nvic_set_priority(NVIC_TIM3_IRQ, 2);
-    nvic_enable_irq(NVIC_TIM3_IRQ);
+    // timer_enable_counter(TIM3);
+
+	// nvic_set_priority(NVIC_TIM3_IRQ, 0);
+ //    nvic_enable_irq(NVIC_TIM3_IRQ);
 
 	// nvic_set_priority(NVIC_ADC_IRQ, 0);
-    // nvic_enable_irq(NVIC_ADC_IRQ);
+ //    nvic_enable_irq(NVIC_ADC_IRQ);
 }
 
 void adc_setup()
@@ -326,31 +351,10 @@ void adc_setup()
 
 usbd_device *usbd_dev;
 
-int count_status(int status)
-{
-    int i, c=0;
-
-    for(i = 0; i < NUM_BUFFERS; ++i)
-        if(data_bufs[i].status == status)
-            c++;
-    return c;
-}
-
-int find_status(int status)
-{
-    int i;
-
-    for(i = 0; i < NUM_BUFFERS; ++i)
-        if(data_bufs[i].status == status)
-            return i;
-    return -1;
-}
-
-int sending=0;
 
 int main(void)
 {
-	int c_started=0, n, cpy, count;
+	int c_started=0, n, cpy;
 	short s;
 
 	rcc_clock_setup_hse_3v3(&hse_8mhz_3v3[CLOCK_3V3_168MHZ]);
@@ -362,7 +366,7 @@ int main(void)
 
 	gpio_mode_setup(GPIOA, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO0);
 	gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9 | GPIO11 | GPIO12);
-	gpio_mode_setup(GPIOD, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO15 | GPIO14 | GPIO13 | GPIO12);
+	gpio_mode_setup(GPIOD, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO15 | GPIO14);
 	gpio_set_af(GPIOA, GPIO_AF10, GPIO9 | GPIO11 | GPIO12);
 
     dma_setup();
@@ -377,44 +381,22 @@ int main(void)
 	usbd_dev = usbd_init(&otgfs_usb_driver, &dev, &config, usb_strings, 3);
 	usbd_register_set_config_callback(usbd_dev, cdcacm_set_config);
 
-    timer_enable_counter(TIM3);
-
 	while (1)
 	{
 		usbd_poll(usbd_dev);
-        if(tail_buf != head_buf && running)
+
+
+        if(head_ptr == tail_ptr)
+            continue;
+
+		if(usbd_ep_write_packet(usbd_dev, 0x81, data_bufs[tail_ptr].data, DATA_BUF_BYTES) != 0)
         {
-            if(usbd_ep_write_packet(usbd_dev, 0x81, data_bufs[tail_buf].data.asBytes, DATA_BUF_BYTELEN) != 0)
-            {
-                gpio_toggle(GPIOD, GPIO14);
-                tail_buf = (tail_buf+1)&NUM_BUFFERS_MASK;
-            }
+            tail_ptr = (tail_ptr+1);
+            if(tail_ptr >= NUM_BUFFERS)
+                tail_ptr = 0;
+            if(sent_counter < NUM_BUFFERS*2)
+                sent_counter++;
         }
-        // count = count_status(0);
-
-        // if(count < BUF_LOW_THRESH)
-        // {
-        //     if(tperiod < 1000)
-        //         tperiod += 10;
-        //     timer_set_period(TIM2, tperiod);
-        //     // if(running)
-        //         // timer_enable_counter(TIM2);
-        //     gpio_set(GPIOD, GPIO12);
-        //     gpio_clear(GPIOD, GPIO13);
-
-        // }
-        // else if(count > BUF_HIGH_THRESH)
-        // {
-        //     if(tperiod > 100)
-        //         tperiod -= 2;
-        //     timer_set_period(TIM2, tperiod);
-        //     // if(running)
-        //         // timer_enable_counter(TIM2);
-        //     gpio_set(GPIOD, GPIO13);
-        //     gpio_clear(GPIOD, GPIO12);
-        // }
-
-
 	}
 }
 
@@ -435,65 +417,90 @@ int main(void)
 //	while(usbd_ep_write_packet(usbd_dev, 0x81, &s, 2)==0 && running == 1) usbd_poll(usbd_dev);
 // }
 
+int lastErr = 0;
+
 void dma2_stream0_isr()
 {
-    int nhead;
+    int nhead,i;
 
     if((DMA2_LISR & DMA_LISR_TCIF0) != 0)
     {
-
         dma_clear_interrupt_flags(DMA2, DMA_STREAM0, DMA_LISR_TCIF0);
 
-        nhead = (head_buf+1)&NUM_BUFFERS_MASK;
-        if(nhead == tail_buf)
-            return;
+        nhead = (head_ptr+1);
+        if(nhead >= NUM_BUFFERS)
+            nhead -= NUM_BUFFERS;
+        if(nhead == tail_ptr)
+            while(1);
+             //return;
 
-        head_buf = nhead;
+        head_ptr = nhead;
 
-        data_bufs[head_buf].status = 1;
+        data_bufs[head_ptr].data[0] = tperiod>>3;
+        for(i = 0; i < DATA_BUF_SHORTS/2; ++i)
+        {
+            data_bufs[head_ptr].data[i*3+1] = dbuf0[i*2]&0xFF;
+            data_bufs[head_ptr].data[i*3+2] = dbuf0[i*2+1]&0xFF;
+            data_bufs[head_ptr].data[i*3+3] = (dbuf0[i*2]>>8) | ((dbuf0[i*2+1]>>4)&0xF0);
+        }
 
-        memcpy(data_bufs[head_buf].data.asBytes, dbuf0, DATA_BUF_BYTELEN);
+        // for(i = 0; i < DATA_BUF_SHORTLEN; ++i)
+        // {
+        //     data_bufs[head_ptr].data.asShorts[i] = tperiod;
+        // }
 
-        // memcpy(&data_bufs[cur_buf].data.asBytes, dbuf0, DATA_BUF_BYTELEN);
-        // dma_set_memory_address(DMA2, DMA_STREAM1, &data_bufs[cur_buf].data.asBytes);
+        if(running)
+        {
+            // dif is number of full buffers
+            int dif = (head_ptr+NUM_BUFFERS-tail_ptr);
+            int err;
 
-        // dma_enable_transfer_complete_interrupt(DMA2, DMA_STREAM1);
-        // dma_enable_stream(DMA2, DMA_STREAM1);
-	//	 while(usbd_ep_write_packet(usbd_dev, 0x81, dbuf0, DATA_BUF_BYTELEN)==0 && running == 1);// usbd_poll(usbd_dev);
+            if(dif >= NUM_BUFFERS)
+                dif -= NUM_BUFFERS;
+
+            err = 32 - dif;
+
+            if(sent_counter < NUM_BUFFERS)
+                err = (int)((float)err * ((float)sent_counter/(float)(NUM_BUFFERS)));
+
+            tperiod -= ((err>>4) + ((err - lastErr)<<3));
+            lastErr = err;
+
+            timer_set_period(TIM2, tperiod >> 3);
+        }
     }
 }
 
-// void dma2_stream1_isr()
+//void dma2_stream1_isr()
+//{
+//    if((DMA2_LISR & DMA_LISR_TCIF1) != 0)
+//    {
+//        dma_clear_interrupt_flags(DMA2, DMA_STREAM1, DMA_LISR_TCIF1);
+//        dma_disable_stream(DMA2, DMA_STREAM1);
+//        // while(usbd_ep_write_packet(usbd_dev, 0x81, data_bufs[cur_buf].data.asBytes, DATA_BUF_BYTELEN)==0 && running == 1);
+//    }
+//}
+
+
+// void tim3_isr()
 // {
-//     if((DMA2_LISR & DMA_LISR_TCIF1) != 0)
+//     TIM_SR(TIM3) &= ~TIM_SR_UIF;
+//     if(running)
 //     {
-//         dma_clear_interrupt_flags(DMA2, DMA_STREAM1, DMA_LISR_TCIF1);
-//         dma_disable_stream(DMA2, DMA_STREAM1);
-//         while(usbd_ep_write_packet(usbd_dev, 0x81, data_bufs[cur_buf].data.asBytes, DATA_BUF_BYTELEN)==0 && running == 1);
+//         // dif is number of full buffers
+//         int dif = (head_ptr+NUM_BUFFERS-tail_ptr) & NUM_BUFFERS_MASK;
+//         int err;
+
+//         err = NUM_BUFFERS/2 - dif;
+
+//         if(sent_counter < NUM_BUFFERS)
+//             err = (int)((float)err * ((float)sent_counter/(float)(NUM_BUFFERS)));
+
+//         tperiod -= (err>>4) + ((err - lastErr)<<2);
+//         lastErr = err;
+//         // timer_set_period(TIM2, tperiod >> 2);
 //     }
 // }
-
-void tim3_isr()
-{
-    int cpy;
-
-    // cpy = find_status(1);
-
-        // if(cpy != -1 && running == 1)
-        // {
-        //     sending = 1;
-        //     if(usbd_ep_write_packet(usbd_dev, 0x81, data_bufs[cpy].data.asBytes, DATA_BUF_BYTELEN) != 0)
-        //     {
-        //         gpio_toggle(GPIOD, GPIO14);
-        //         data_bufs[cpy].status = 0;
-        //     }
-        //     sending = 0;
-        // }
-
-    TIM_SR(TIM3) &= ~TIM_SR_UIF;
-    gpio_toggle(GPIOD, GPIO15);
-
-}
 
 void exit(int a)
 {
