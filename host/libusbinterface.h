@@ -21,8 +21,11 @@ public:
 private:
     boost::mutex *mQueue;
     std::queue<boost::shared_array<unsigned char> > *dQueue;
+
+    // Attributes to look for in the USB devices
     unsigned idProduct, idVendor;
     std::string serialId;
+
     unsigned char data_buf[DATA_LEN];
     int total_len;
 
@@ -32,14 +35,17 @@ private:
     void send_start();
     void send_end();
 
+    // Send data to the data processor thread
     void send_data(boost::shared_array<unsigned char>);
-
-    static void LIBUSB_CALL transfer_callback(struct libusb_transfer *transfer);
 
     int status;
     libusb_device_handle *devh;
 
+    // Periodic bulk transfer of data from the device
     struct libusb_transfer *energy_transfer;
+    static void LIBUSB_CALL transfer_callback(struct libusb_transfer *transfer);
+
+    // This class handles the sending on control information to the device
 
     class MonitorCommand
     {
@@ -51,6 +57,7 @@ private:
         int cmd_val;
     };
 
+    // Our command queue
     std::queue<MonitorCommand> cQueue;
 };
 
