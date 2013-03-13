@@ -62,6 +62,17 @@ void DataProcessor::getData()
 
 }
 
+/*
+    This decodes the data that has been received. The data is 'compressed'. The
+    first byte of each 64 byte transfer is the timer period between sequential
+    samples. The remaining 63 bytes encodes 42 samples (2 samples / 3 bytes).
+
+    0       Timer period
+    3n+1    Low 8 bits of sample n*2
+    3n+2    Low 8 bits of sample n*2+1
+    3n+3    Low 4 bits  : bits 11-8 of sample n*2
+            High 4 bits : bits 11-8 of sample n*2+1
+ */
 void DataProcessor::processData()
 {
     int i, c = 0;
