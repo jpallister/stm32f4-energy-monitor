@@ -3,6 +3,7 @@ CC=~/sat_toolchain/bin/arm-none-eabi-gcc
 FLAGS += -T libopencm3_stm32f4.ld
 
 FLAGS += -D STM32F4
+# FLAGS += -O
 FLAGS += -g -fno-common
 FLAGS += -mcpu=cortex-m4 -mthumb
 FLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
