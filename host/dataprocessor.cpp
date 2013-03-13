@@ -89,9 +89,9 @@ void DataProcessor::processData()
         {
             b1 |= (data[i]&0x0F) << 8;
             b2 |= (data[i]&0xF0) << 4;
-            fprintf(output, "%d %ul\n", b1, cur_time);
+            fprintf(output, "%d %lu\n", b1, cur_time);
             cur_time += rate;
-            fprintf(output, "%d %ul\n", b2, cur_time);
+            fprintf(output, "%d %lu\n", b2, cur_time);
             cur_time += rate;
         }
     }
