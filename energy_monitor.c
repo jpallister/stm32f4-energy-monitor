@@ -326,17 +326,19 @@ void timer_setup()
 
 void adc_setup()
 {
-	gpio_mode_setup(GPIOA, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO1);
+	gpio_mode_setup(GPIOA, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO1 | GPIO2);
 	rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_ADC1EN);
 	adc_set_clk_prescale(0);
-	adc_disable_scan_mode(ADC1);
 	adc_set_single_conversion_mode(ADC1);
-	adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR1_SMP_1DOT5CYC);
+    adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR1_SMP_1DOT5CYC);
+	adc_set_sample_time(ADC1, ADC_CHANNEL2, ADC_SMPR1_SMP_1DOT5CYC);
 
-	u8 channels[] = {ADC_CHANNEL1};
-	adc_set_regular_sequence(ADC1, 1, channels);
+	u8 channels[] = {ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL2};
+	adc_set_regular_sequence(ADC1, 3, channels);
+    adc_enable_scan_mode(ADC1);
+    adc_enable_discontinuous_mode_regular(ADC1, ADC_CR1_DISCNUM_1CHANNELS);
 
-	// adc_enable_eoc_interrupt(ADC1);
+	adc_set_resolution(ADC1, ADC_CR1_RES_12BIT);
 
 	adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
 
