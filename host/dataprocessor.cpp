@@ -37,7 +37,7 @@ void DataProcessor::operator()()
         t2 = time(0);
         if(t2 - t1 >= 2)
         {
-            printf("D %f\n",(float)total/(t2-t1));
+            // printf("D %f\n",(float)total/(t2-t1));
             t1 = t2;
             total = 0;
         }

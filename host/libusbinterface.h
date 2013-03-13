@@ -16,6 +16,8 @@ public:
     void operator()();
     void endSignal();
 
+    void sendCommand(int cmd);
+
 private:
     boost::mutex *mQueue;
     std::queue<boost::shared_array<unsigned char> > *dQueue;
@@ -38,6 +40,18 @@ private:
     libusb_device_handle *devh;
 
     struct libusb_transfer *energy_transfer;
+
+    class MonitorCommand
+    {
+    public:
+        MonitorCommand(int cmd);
+
+        void Send(libusb_device_handle *devh);
+    private:
+        int cmd_val;
+    };
+
+    std::queue<MonitorCommand> cQueue;
 };
 
 #endif
