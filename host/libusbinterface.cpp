@@ -66,9 +66,15 @@ void LibusbInterface::operator()()
 
         if(t2 - t1 >= 2)
         {
-            printf("%f\n", (float)total_len/(t2-t1));
+            // printf("%f\n", (float)total_len/(t2-t1));
             t1=t2;
             total_len = 0;
+        }
+
+        if(!cQueue.empty())
+        {
+            cQueue.front().Send(devh);
+            cQueue.pop();
         }
     }
 
@@ -224,4 +230,23 @@ void LIBUSB_CALL LibusbInterface::transfer_callback(struct libusb_transfer *tran
 void LibusbInterface::endSignal()
 {
     status = 1;
+}
+
+void LibusbInterface::sendCommand(int cmd)
+{
+    // Queue commands, because this can be from any thread
+    cQueue.push(MonitorCommand(cmd));
+}
+
+
+
+LibusbInterface::MonitorCommand::MonitorCommand(int cmd)
+{
+    cmd_val = cmd;
+}
+
+void LibusbInterface::MonitorCommand::Send(libusb_device_handle *devh)
+{
+    // Use synchronous IO for this (should be short?)
+    libusb_control_transfer(devh, 65, cmd_val, 0, 0, NULL, 0, 0);
 }
