@@ -30,6 +30,8 @@ void DataProcessor::operator()()
     while(status == 0)
     {
         getData();
+        if(status != 0)
+            continue;
         processData();
         total += DATA_LEN;
         // printf("gda\n");
@@ -58,7 +60,7 @@ void DataProcessor::getData()
             }
         }
         sleep(1);
-    } while(1);
+    } while(status == 0);
 
 }
 

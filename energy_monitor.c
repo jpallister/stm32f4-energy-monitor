@@ -62,6 +62,13 @@ static const struct usb_endpoint_descriptor data_endp[] = {{
 	.bmAttributes = USB_ENDPOINT_ATTR_BULK,
 	.wMaxPacketSize = 64,
 	.bInterval = 0,
+}, {
+    .bLength = USB_DT_ENDPOINT_SIZE,
+    .bDescriptorType = USB_DT_ENDPOINT,
+    .bEndpointAddress = 0x82,
+    .bmAttributes = USB_ENDPOINT_ATTR_INTERRUPT,
+    .wMaxPacketSize = 64,
+    .bInterval = 0,
 }};
 /*
 static const struct {
@@ -104,7 +111,7 @@ static const struct usb_interface_descriptor data_iface[] = {{
 	.bDescriptorType = USB_DT_INTERFACE,
 	.bInterfaceNumber = 0,
 	.bAlternateSetting = 0,
-	.bNumEndpoints = 2,
+	.bNumEndpoints = 3,
 	.bInterfaceClass = 0xFF,
 	.bInterfaceSubClass = 0,
     .bInterfaceProtocol = 0,
@@ -134,8 +141,12 @@ static const struct usb_config_descriptor config = {
 static const char *usb_strings[] = {
 	"James Pallister",
 	"Medium speed energy monitor",
-	"JP",
+	"MSEM0000",
 };
+
+int running = 0;
+int head_ptr = 0, tail_ptr = 0;
+// char globbuf[2] = {0xAB, 0xCD};
 
 static int cdcacm_control_request(usbd_device *usbd_dev, struct usb_setup_data *req, u8 **buf,
 		u16 *len, void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
@@ -144,36 +155,37 @@ static int cdcacm_control_request(usbd_device *usbd_dev, struct usb_setup_data *
 	(void)buf;
 	(void)usbd_dev;
 
-	switch (req->bRequest) {
-	case 0:
-	case 3:
-	case 4:
-		return 1;
-	case 29:
-		return 1;
-	case USB_CDC_REQ_SET_CONTROL_LINE_STATE: {
-		/*
-		 * This Linux cdc_acm driver requires this to be implemented
-		 * even though it's optional in the CDC spec, and we don't
-		 * advertise it in the ACM functional descriptor.
-		 */
-         buf[8] = 0;
-         buf[9] = 0;
-		return 1;
-		}
-	case USB_CDC_REQ_SET_LINE_CODING:
-		if (*len < sizeof(struct usb_cdc_line_coding))
-			return 0;
+    gpio_toggle(GPIOD, GPIO14);
 
-		return 1;
+
+	switch (req->bRequest) {
+	case 0:    // toggle LEDS
+        gpio_toggle(GPIOD, GPIO13);
+        *len = 0;
+        break;
+    case 1:     // Start
+    {
+        running = 1;
+        head_ptr = 0;
+        tail_ptr = 0;
+        timer_enable_counter(TIM2);
+        adc_power_on(ADC1);
+        *len = 0;
+        break;
+    }
+    case 2:
+    {
+        running = 0;
+        timer_disable_counter(TIM2);
+        adc_off(ADC1);
+        *len = 0;
+        break;
+    }
     default:
         return 0;
 	}
-	return 0;
+	return 1;
 }
-
-int running = 0;
-int head_ptr = 0, tail_ptr = 0;
 
 static void cdcacm_data_rx_cb(usbd_device *usbd_dev, u8 ep)
 {
@@ -368,7 +380,7 @@ int main(void)
 
 	gpio_mode_setup(GPIOA, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO0);
 	gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9 | GPIO11 | GPIO12);
-	gpio_mode_setup(GPIOD, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO15 | GPIO14);
+	gpio_mode_setup(GPIOD, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO15 | GPIO14 | GPIO13 | GPIO12);
 	gpio_set_af(GPIOA, GPIO_AF10, GPIO9 | GPIO11 | GPIO12);
 
     dma_setup();
@@ -377,22 +389,21 @@ int main(void)
 
 	gpio_toggle(GPIOA, GPIO12);
 
-	gpio_toggle(GPIOD, GPIO15);
-
 
 	usbd_dev = usbd_init(&otgfs_usb_driver, &dev, &config, usb_strings, 3);
 	usbd_register_set_config_callback(usbd_dev, cdcacm_set_config);
 
 	while (1)
 	{
-		usbd_poll(usbd_dev);
-
+        usbd_poll(usbd_dev);
 
         if(head_ptr == tail_ptr)
             continue;
 
 		if(usbd_ep_write_packet(usbd_dev, 0x81, data_bufs[tail_ptr].data, DATA_BUF_BYTES) != 0)
         {
+            gpio_toggle(GPIOD, GPIO15);
+
             tail_ptr = (tail_ptr+1);
             if(tail_ptr >= NUM_BUFFERS)
                 tail_ptr = 0;

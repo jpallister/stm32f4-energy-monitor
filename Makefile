@@ -18,4 +18,5 @@ energy_monitor: energy_monitor.c Makefile
 	$(CC) $(FLAGS) $(SRC) -o energy_monitor -lopencm3_stm32f4
 
 host_receiver: host/host_receiver.cpp host/libusbinterface.cpp host/dataprocessor.cpp Makefile
-	g++ -o host_receiver host/host_receiver.cpp host/libusbinterface.cpp host/dataprocessor.cpp -lboost_thread-mt -lusb-1.0 -g -O2
+	g++ -o host_receiver host/host_receiver.cpp host/libusbinterface.cpp host/dataprocessor.cpp -lboost_thread-mt -lusb-1.0 -g -O2 -std=c++11
+	# clang -o host_receiver host/host_receiver.cpp host/libusbinterface.cpp host/dataprocessor.cpp -lboost_thread-mt -lusb-1.0 -g -O2

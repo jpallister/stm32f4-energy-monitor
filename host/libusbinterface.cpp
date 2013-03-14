@@ -7,6 +7,7 @@
 
 using namespace boost;
 // using namespace boost::bind;
+using namespace std;
 
 LibusbInterface::LibusbInterface(boost::mutex *m, std::queue<boost::shared_array<unsigned char> > *d,
     unsigned idVendor, unsigned idProduct, std::string serialId)
@@ -18,6 +19,7 @@ LibusbInterface::LibusbInterface(boost::mutex *m, std::queue<boost::shared_array
     this->serialId = serialId;
     status = 0;
     total_len = 0;
+    running = false;
 }
 
 LibusbInterface::~LibusbInterface()
@@ -25,13 +27,66 @@ LibusbInterface::~LibusbInterface()
     printf("Destructr\n");
 }
 
+std::vector<std::pair<std::string, std::string> > LibusbInterface::listDevices(unsigned idVendor, unsigned idProduct)
+{
+    libusb_device **devs, *dev;
+    int i = 0, r;
+    ssize_t cnt;
+    vector<pair<string,string> > devlist;
+
+    cnt = libusb_get_device_list(NULL, &devs);
+    if (cnt < 0)
+    {
+        printf("Could not get device list: %d\n", (int)cnt);
+        exit(1);
+    }
+
+    while ((dev = devs[i++]) != NULL)
+    {
+        struct libusb_device_descriptor desc;
+        libusb_device_handle *devh;
+
+        int r = libusb_get_device_descriptor(dev, &desc);
+        if (r < 0)
+        {
+            printf("Failed to get device descriptor: %d\n", r);
+            continue;
+        }
+
+        if(desc.idVendor == idVendor && desc.idProduct == idProduct)
+        {
+            unsigned char sId[256];
+
+            r = libusb_open(dev, &devh);
+            if(r < 0)
+            {
+                printf("Failed to open device: %d\n", r);
+                continue;
+            }
+
+            r = libusb_get_string_descriptor_ascii(devh, desc.iSerialNumber, sId, 256);
+            if(r < 0)
+            {
+                printf("Failed to get string descriptor: %d\n", r);
+                continue;
+            }
+
+            devlist.push_back(make_pair(std::string((char*)sId), ""));
+
+            libusb_close(devh);
+        }
+    }
+
+    return devlist;
+}
+
+
 void LibusbInterface::operator()()
 {
     int r;
     int t1, t2;
 
-    if(open_device())
-        printf("Opened\n");
+    open_device();
 
     energy_transfer = libusb_alloc_transfer(0);
     if(!energy_transfer)
@@ -40,21 +95,18 @@ void LibusbInterface::operator()()
         return;
     }
 
-    libusb_fill_bulk_transfer(energy_transfer, devh, (1 | LIBUSB_ENDPOINT_IN), data_buf, sizeof(data_buf), &LibusbInterface::transfer_callback, this, 500);
+    libusb_fill_bulk_transfer(energy_transfer, devh, (1 | LIBUSB_ENDPOINT_IN), data_buf, sizeof(data_buf), &LibusbInterface::transfer_callback, this, 100);
 
-    if(status == 0)
-        send_start();
-
-    if((r=libusb_submit_transfer(energy_transfer)) < 0)
-    {
-        printf("Submit transfer error: %d\n", r);
-        return;
-    }
+    // if(status == 0)
+    //     sendCommand(START);
 
     t1 = time(0);
     while(status == 0)
     {
-        r = libusb_handle_events(NULL);
+        timeval tv;
+        tv.tv_sec = 0;
+        tv.tv_usec = 100000;
+        r = libusb_handle_events_timeout(NULL, &tv);
 
         if(r < 0)
         {
@@ -73,13 +125,14 @@ void LibusbInterface::operator()()
 
         if(!cQueue.empty())
         {
-            cQueue.front().Send(devh);
-            cQueue.pop();
+            boost::mutex::scoped_lock(cQueueMutex);
+            if(sendMonitorCommand(cQueue.front()))
+                cQueue.pop();
         }
     }
 
     if(devh)
-        send_end();
+        while(!sendMonitorCommand(STOP));
 
     close_device();
 }
@@ -178,14 +231,6 @@ void LibusbInterface::close_device()
 {
     if(devh)
     {
-        int len, r;
-        unsigned char buf[2];
-
-        do
-        {
-            r = libusb_bulk_transfer(devh, 0x81, buf, 1, &len, 100);
-        } while(len > 0 && r >= 0);
-
         libusb_release_interface(devh, 0);
         libusb_close(devh);
     }
@@ -206,6 +251,8 @@ void LIBUSB_CALL LibusbInterface::transfer_callback(struct libusb_transfer *tran
 
     if(transfer->status != LIBUSB_TRANSFER_COMPLETED)
     {
+        if(transfer->status == LIBUSB_TRANSFER_CANCELLED)
+            return;
         printf("Transfer status: %d\n", transfer->status);
         libusb_free_transfer(transfer);
         _this->energy_transfer = NULL;
@@ -232,21 +279,36 @@ void LibusbInterface::endSignal()
     status = 1;
 }
 
-void LibusbInterface::sendCommand(int cmd)
+void LibusbInterface::sendCommand(CommandType cmd)
 {
+    boost::mutex::scoped_lock(cQueueMutex);
     // Queue commands, because this can be from any thread
-    cQueue.push(MonitorCommand(cmd));
+    cQueue.push(cmd);
 }
 
-
-
-LibusbInterface::MonitorCommand::MonitorCommand(int cmd)
+bool LibusbInterface::sendMonitorCommand(CommandType cmd)
 {
-    cmd_val = cmd;
-}
+    int r;
+    r = libusb_control_transfer(devh, 0x41, cmd, 0, 0, NULL, 0, 100);
 
-void LibusbInterface::MonitorCommand::Send(libusb_device_handle *devh)
-{
-    // Use synchronous IO for this (should be short?)
-    libusb_control_transfer(devh, 65, cmd_val, 0, 0, NULL, 0, 0);
+    if(r < 0)
+    {
+        printf("Failed to send cmd: %d\n", r);
+        return false;
+    }
+
+    if(cmd == STOP)
+    {
+        if(running)
+            libusb_cancel_transfer(energy_transfer);
+        running = false;
+    }
+    if(cmd == START)
+    {
+        if(!running)
+            libusb_submit_transfer(energy_transfer);
+        running = true;
+    }
+
+    return true;
 }
