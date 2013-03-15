@@ -64,42 +64,7 @@ static const struct usb_endpoint_descriptor data_endp[] = {{
 	.wMaxPacketSize = 64,
 	.bInterval = 1,
 }};
-/*
-static const struct {
-	struct usb_cdc_header_descriptor header;
-	struct usb_cdc_call_management_descriptor call_mgmt;
-	struct usb_cdc_acm_descriptor acm;
-	struct usb_cdc_union_descriptor cdc_union;
-} __attribute__((packed)) cdcacm_functional_descriptors = {
-	.header = {
-		.bFunctionLength = sizeof(struct usb_cdc_header_descriptor),
-		.bDescriptorType = CS_INTERFACE,
-		.bDescriptorSubtype = USB_CDC_TYPE_HEADER,
-		.bcdCDC = 0x0110,
-	},
-	.call_mgmt = {
-		.bFunctionLength =
-			sizeof(struct usb_cdc_call_management_descriptor),
-		.bDescriptorType = CS_INTERFACE,
-		.bDescriptorSubtype = USB_CDC_TYPE_CALL_MANAGEMENT,
-		.bmCapabilities = 3,
-		.bDataInterface = 1,
-	},
-	.acm = {
-		.bFunctionLength = sizeof(struct usb_cdc_acm_descriptor),
-		.bDescriptorType = CS_INTERFACE,
-		.bDescriptorSubtype = USB_CDC_TYPE_ACM,
-		.bmCapabilities = 6,
-	},
-	.cdc_union = {
-		.bFunctionLength = sizeof(struct usb_cdc_union_descriptor),
-		.bDescriptorType = CS_INTERFACE,
-		.bDescriptorSubtype = USB_CDC_TYPE_UNION,
-		.bControlInterface = 0,
-		.bSubordinateInterface0 = 1,
-	 }
-};
-*/
+
 static const struct usb_interface_descriptor data_iface[] = {{
 	.bLength = USB_DT_INTERFACE_SIZE,
 	.bDescriptorType = USB_DT_INTERFACE,
@@ -245,11 +210,6 @@ static void cdcacm_set_config(usbd_device *usbd_dev, u16 wValue)
 	usbd_ep_setup(usbd_dev, 0x01, USB_ENDPOINT_ATTR_BULK, 64, cdcacm_data_rx_cb);
 	usbd_ep_setup(usbd_dev, 0x81, USB_ENDPOINT_ATTR_BULK, 64, NULL);
 
-	// usbd_register_control_callback(
-	// 			usbd_dev,
-	// 			USB_REQ_TYPE_CLASS | USB_REQ_TYPE_INTERFACE,
-	// 			USB_REQ_TYPE_TYPE | USB_REQ_TYPE_RECIPIENT,
-	// 			cdcacm_control_request);
 	usbd_register_control_callback(
 				usbd_dev,
 				USB_REQ_TYPE_VENDOR | USB_REQ_TYPE_INTERFACE,
@@ -278,7 +238,7 @@ power_data data_bufs[NUM_BUFFERS] = {0};
 short dbuf0[DATA_BUF_SHORTS];
 int sent_counter=0;
 
-//#define TPERIOD_INIT    800
+
 #define TPERIOD_INIT    1600
 
 int tperiod=TPERIOD_INIT;
@@ -305,21 +265,6 @@ void dma_setup()
     nvic_set_priority(NVIC_DMA2_STREAM0_IRQ, 3);
     nvic_enable_irq(NVIC_DMA2_STREAM0_IRQ);
     dma_enable_stream(DMA2, DMA_STREAM0);
-
-    // Memory to memory dma
-    // dma_stream_reset(DMA2, DMA_STREAM1);
-    // dma_set_transfer_mode(DMA2, DMA_STREAM1, DMA_SxCR_DIR_MEM_TO_MEM);
-    // dma_set_priority(DMA2, DMA_STREAM1, DMA_SxCR_PL_VERY_HIGH);
-    // dma_set_peripheral_size(DMA2, DMA_STREAM1, DMA_SxCR_PSIZE_32BIT);
-    // dma_set_memory_size(DMA2, DMA_STREAM1, DMA_SxCR_MSIZE_32BIT);
-    // dma_enable_memory_increment_mode(DMA2, DMA_STREAM1);
-    // dma_enable_peripheral_increment_mode(DMA2, DMA_STREAM1);
-    // dma_set_peripheral_address(DMA2, DMA_STREAM1, dbuf0);
-    // // dma_set_number_of_data(DMA2, DMA_STREAM1, DATA_BUF_LONGLEN);
-
-    // dma_enable_transfer_complete_interrupt(DMA2, DMA_STREAM1);
-    // nvic_set_priority(NVIC_DMA2_STREAM1_IRQ, 4);
-    // nvic_enable_irq(NVIC_DMA2_STREAM1_IRQ);
 }
 
 void timer_setup()
@@ -342,14 +287,6 @@ void timer_setup()
 	timer_set_clock_division(TIM3, TIM_CR1_CKD_CK_INT);
 	timer_set_master_mode(TIM3, TIM_CR2_MMS_UPDATE);
     timer_enable_irq(TIM3, TIM_DIER_UIE);
-
-    // timer_enable_counter(TIM3);
-
-	// nvic_set_priority(NVIC_TIM3_IRQ, 0);
- //    nvic_enable_irq(NVIC_TIM3_IRQ);
-
-	// nvic_set_priority(NVIC_ADC_IRQ, 0);
- //    nvic_enable_irq(NVIC_ADC_IRQ);
 }
 
 void adc_setup()
@@ -430,22 +367,6 @@ int main(void)
 }
 
 
-
-// void adc_isr()
-// {
-// 	short s;
-//     char buf[64];
-
-//     if(!running)
-//         return;
-// 	ADC_SR(ADC1) &= ~ADC_SR_EOC;
-// 	s = adc_read_regular(ADC1);
-// 	while(usbd_ep_write_packet(usbd_dev, 0x81, &s, 2)==0 && running == 1);// usbd_poll(usbd_dev);
-//	while(usbd_ep_write_packet(usbd_dev, 0x81, buf, 64)==0 && running == 1);// usbd_poll(usbd_dev);
-//	s = timer_get_counter(TIM2);
-//	while(usbd_ep_write_packet(usbd_dev, 0x81, &s, 2)==0 && running == 1) usbd_poll(usbd_dev);
-// }
-
 int lastErr = 0;
 
 void dma2_stream0_isr()
@@ -461,7 +382,7 @@ void dma2_stream0_isr()
             nhead -= NUM_BUFFERS;
         if(nhead == tail_ptr)
             while(1);
-             //return;
+
 
         head_ptr = nhead;
 
@@ -472,11 +393,6 @@ void dma2_stream0_isr()
             data_bufs[head_ptr].data[i*3+2] = dbuf0[i*2+1]&0xFF;
             data_bufs[head_ptr].data[i*3+3] = (dbuf0[i*2]>>8) | ((dbuf0[i*2+1]>>4)&0xF0);
         }
-
-        // for(i = 0; i < DATA_BUF_SHORTLEN; ++i)
-        // {
-        //     data_bufs[head_ptr].data.asShorts[i] = tperiod;
-        // }
 
         if(running)
         {
@@ -499,37 +415,6 @@ void dma2_stream0_isr()
         }
     }
 }
-
-//void dma2_stream1_isr()
-//{
-//    if((DMA2_LISR & DMA_LISR_TCIF1) != 0)
-//    {
-//        dma_clear_interrupt_flags(DMA2, DMA_STREAM1, DMA_LISR_TCIF1);
-//        dma_disable_stream(DMA2, DMA_STREAM1);
-//        // while(usbd_ep_write_packet(usbd_dev, 0x81, data_bufs[cur_buf].data.asBytes, DATA_BUF_BYTELEN)==0 && running == 1);
-//    }
-//}
-
-
-// void tim3_isr()
-// {
-//     TIM_SR(TIM3) &= ~TIM_SR_UIF;
-//     if(running)
-//     {
-//         // dif is number of full buffers
-//         int dif = (head_ptr+NUM_BUFFERS-tail_ptr) & NUM_BUFFERS_MASK;
-//         int err;
-
-//         err = NUM_BUFFERS/2 - dif;
-
-//         if(sent_counter < NUM_BUFFERS)
-//             err = (int)((float)err * ((float)sent_counter/(float)(NUM_BUFFERS)));
-
-//         tperiod -= (err>>4) + ((err - lastErr)<<2);
-//         lastErr = err;
-//         // timer_set_period(TIM2, tperiod >> 2);
-//     }
-// }
 
 void exit(int a)
 {
