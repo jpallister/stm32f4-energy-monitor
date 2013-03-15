@@ -4,16 +4,19 @@
 #include <string>
 #include <boost/bind.hpp>
 #include <time.h>
+#include <signal.h>
+#include "helper.h"
 
 using namespace boost;
 // using namespace boost::bind;
 using namespace std;
 
-LibusbInterface::LibusbInterface(boost::mutex *m, std::queue<boost::shared_array<unsigned char> > *d,
-    unsigned idVendor, unsigned idProduct, std::string serialId)
+LibusbInterface::LibusbInterface(boost::mutex *m, queue<shared_array<unsigned char> > *d,
+    unsigned idVendor, unsigned idProduct, string serialId)
 {
     mQueue = m;
     dQueue = d;
+    main_thread = tid;
     this->idVendor = idVendor;
     this->idProduct = idProduct;
     this->serialId = serialId;
@@ -118,7 +121,9 @@ void LibusbInterface::operator()()
 
         if(t2 - t1 >= 2)
         {
-            // printf("%f\n", (float)total_len/(t2-t1));
+            mt_start_output();
+            printf("%f\n", (float)total_len/(t2-t1));
+            mt_end_output();
             t1=t2;
             total_len = 0;
         }

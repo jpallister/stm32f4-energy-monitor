@@ -10,6 +10,9 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <readline/readline.h>
+#include <readline/history.h>
+#include <sys/types.h>
 
 using namespace std;
 using namespace boost;
@@ -87,7 +90,7 @@ void processCommand(string input)
         }
 
         dQueue.reset(new queue<shared_array<unsigned char> >());
-        liObj.reset(new LibusbInterface(&bmutex, dQueue.get(), 0x1337, 0x1337, chosen_serial));
+        liObj.reset(new LibusbInterface(&bmutex, dQueue.get(), getpid(), 0x1337, 0x1337, chosen_serial));
         dpObj.reset(new DataProcessor(&bmutex, dQueue.get()));
 
         thread1 = boost::thread(bind(&LibusbInterface::operator(),liObj.get()));  // Bind prevents copying obj (need to keep ptr)
@@ -157,6 +160,17 @@ void processCommand(string input)
         cout << "    exit                       Exit the application" << endl;
         return;
     }
+    else if(args[0] == "exit" || args[0] == "quit")
+    {
+        cout << "Exiting...\n";
+        if(connected)
+        {
+            liObj->endSignal();
+            dpObj->endSignal();
+            connected = false;
+        }
+        running = false;
+    }
     else
     {
         cout << " *** Unrecognised command \"" << args[0] << "\"" << endl;
@@ -165,7 +179,7 @@ void processCommand(string input)
 
 int main()
 {
-    string input;
+    char *input;
     int r;
 
     r = libusb_init(NULL);
@@ -175,24 +189,18 @@ int main()
         return false;
     }
 
+    rl_bind_key('\t',rl_abort);
+
     while(running)
     {
-        cout << "> ";
-        getline(cin, input);
+        input = readline("> ");
 
-        if(input == "exit" || input == "\x0D" || input == "quit")
-        {
-            cout << "Exiting...\n";
-            if(connected)
-            {
-                liObj->endSignal();
-                dpObj->endSignal();
-                running = false;
-                connected = false;
-            }
-        }
-        else
-            processCommand(input);
+        if(input == NULL)
+            continue;
+
+        processCommand(input);
+        add_history(input);
+        free(input);
     }
 
     thread1.join();

@@ -28,6 +28,7 @@
 #include <libopencm3/cm3/nvic.h>
 #include <libopencm3/stm32/f4/dma.h>
 #include <libopencm3/stm32/f4/flash.h>
+#include <libopencm3/stm32/exti.h>
 
 // USB Code
 
@@ -270,7 +271,6 @@ void dma_setup()
 void timer_setup()
 {
 	rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_TIM2EN);
-	rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_TIM3EN);
 
 	timer_reset(TIM2);
 	timer_set_mode(TIM2, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
@@ -279,14 +279,6 @@ void timer_setup()
 	timer_set_clock_division(TIM2, TIM_CR1_CKD_CK_INT);
 	timer_set_master_mode(TIM2, TIM_CR2_MMS_UPDATE);
     timer_enable_preload(TIM2);
-
-    timer_reset(TIM3);
-	timer_set_mode(TIM3, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
-	timer_set_period(TIM3, 100);
-	timer_set_prescaler(TIM3, 167);
-	timer_set_clock_division(TIM3, TIM_CR1_CKD_CK_INT);
-	timer_set_master_mode(TIM3, TIM_CR2_MMS_UPDATE);
-    timer_enable_irq(TIM3, TIM_DIER_UIE);
 }
 
 void adc_setup()
@@ -316,6 +308,29 @@ void adc_setup()
 	adc_power_on(ADC1);
 }
 
+void exti_setup()
+{
+    exti_select_source(EXTI0, GPIOA);
+    exti_set_trigger(EXTI0, EXTI_TRIGGER_BOTH);
+    exti_enable_request(EXTI0);
+    nvic_enable_irq(NVIC_EXTI0_IRQ);
+
+    // Timer is used for deboucing
+    // If output on trigger is the same 30ms later, accept as input
+    rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_TIM3EN);
+    timer_reset(TIM3);
+    timer_set_mode(TIM3, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
+    timer_set_period(TIM3, 300);
+    timer_set_prescaler(TIM3, 1679);
+    timer_set_clock_division(TIM3, TIM_CR1_CKD_CK_INT);
+    timer_set_master_mode(TIM3, TIM_CR2_MMS_UPDATE);
+    timer_enable_irq(TIM3, TIM_DIER_UIE);
+
+    nvic_set_priority(NVIC_TIM3_IRQ, 0);
+    nvic_enable_irq(NVIC_TIM3_IRQ);
+
+}
+
 usbd_device *usbd_dev;
 
 
@@ -339,6 +354,7 @@ int main(void)
     dma_setup();
 	adc_setup();
 	timer_setup();
+    exti_setup();
 
 	gpio_toggle(GPIOA, GPIO12);
 
@@ -413,6 +429,31 @@ void dma2_stream0_isr()
 
             timer_set_period(TIM2, tperiod >> 3);
         }
+    }
+}
+
+int status = -1;
+
+void exti0_isr()
+{
+    exti_reset_request(EXTI0);
+
+    if(status == -1)
+    {
+        status = gpio_get(GPIOA, GPIO0);
+        timer_enable_counter(TIM3);
+        timer_set_counter(TIM3, 0);
+    }
+}
+
+void tim3_isr()
+{
+    TIM_SR(TIM3) &= ~TIM_SR_UIF;
+    if(gpio_get(GPIOA, GPIO0))
+    {
+        gpio_toggle(GPIOD, GPIO12);
+        timer_disable_counter(TIM3);
+        status = -1;
     }
 }
 
