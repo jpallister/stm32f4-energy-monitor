@@ -23,9 +23,11 @@ public:
         LED = 0,
         START = 1,
         STOP = 2,
+        SETSERIAL = 3
     };
 
     void sendCommand(CommandType);
+    void setSerial(std::string);
 
 private:
     boost::mutex *mQueue;
@@ -58,10 +60,15 @@ private:
 
     // This class handles the sending on control information to the device
 
-    bool sendMonitorCommand(CommandType cmd);
+    struct CommandData {
+        CommandType cmd;
+        std::string cmd_data;
+    };
+
+    bool sendMonitorCommand(CommandData cmd);
 
     // Our command queue
-    std::queue<CommandType> cQueue;
+    std::queue<CommandData> cQueue;
 };
 
 #endif

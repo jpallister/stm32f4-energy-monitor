@@ -20,6 +20,7 @@ scoped_ptr<LibusbInterface> liObj;
 scoped_ptr<DataProcessor> dpObj;
 boost::thread thread1, thread2;
 bool running = true;
+string chosen_serial;
 
 bool connected = false;
 
@@ -48,7 +49,6 @@ void processCommand(string input)
     else if (args[0] == "connect")
     {
         auto devlist = LibusbInterface::listDevices(0x1337, 0x1337);
-        string serial;
         int i = 0;
 
         if(devlist.empty())
@@ -69,12 +69,12 @@ void processCommand(string input)
             else
             {
                 int devn = lexical_cast<int>(args[1]);
-                serial = devlist[devn].first;
+                chosen_serial = devlist[devn].first;
             }
         }
         else
         {
-            serial = devlist[0].first;
+            chosen_serial = devlist[0].first;
         }
 
         if(connected)
@@ -87,21 +87,36 @@ void processCommand(string input)
         }
 
         dQueue.reset(new queue<shared_array<unsigned char> >());
-        liObj.reset(new LibusbInterface(&bmutex, dQueue.get(), 0x1337, 0x1337, serial));
+        liObj.reset(new LibusbInterface(&bmutex, dQueue.get(), 0x1337, 0x1337, chosen_serial));
         dpObj.reset(new DataProcessor(&bmutex, dQueue.get()));
 
         thread1 = boost::thread(bind(&LibusbInterface::operator(),liObj.get()));  // Bind prevents copying obj (need to keep ptr)
         thread2 = boost::thread(bind(&DataProcessor::operator(),dpObj.get()));
 
         connected = true;
+        cout << "    Connected to device, serial: " << chosen_serial << endl;
     }
     else if(args[0] == "getserial")
     {
-
+        if(!connected)
+            cout << "    Need to be connected" << endl;
+        else
+            cout << "    Connected device, serial: " << chosen_serial << endl;
     }
     else if(args[0] == "setserial")
     {
-
+        if(args.size() < 2)
+        {
+            cout << "Command expects parameters" << endl;
+            return;
+        }
+        if(args[1].length() != 8)
+        {
+            cout << "Length of the serial string must be 8 characters" << endl;
+            return;
+        }
+        cout << "    Setting serial to " << args[1] << endl;
+        liObj->setSerial(args[1]);
     }
     else if(args[0] == "trigger")
     {
@@ -130,6 +145,8 @@ void processCommand(string input)
         cout << "             [SERIAL]           Select the device by serial number" << endl;
         cout << "    getserial                   Get the serial number of current device" << endl;
         cout << "    setserial SERIAL            Set the serial number of current device" << endl;
+        cout << "                                Reconnection required before new serial recognised" << endl;
+        cout << "    leds                        Toggle the LEDs" << endl;
         cout << "    trigger " << endl;
         cout << "             (start | stop)     Start/stop the energy measurement" << endl;
         cout << "             pin PIN            The energy measurement is started/stopped on PIN" << endl;

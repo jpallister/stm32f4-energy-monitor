@@ -27,6 +27,7 @@
 #include <libopencm3/cm3/scb.h>
 #include <libopencm3/cm3/nvic.h>
 #include <libopencm3/stm32/f4/dma.h>
+#include <libopencm3/stm32/f4/flash.h>
 
 // USB Code
 
@@ -54,21 +55,14 @@ static const struct usb_endpoint_descriptor data_endp[] = {{
 	.bEndpointAddress = 0x81,
 	.bmAttributes = USB_ENDPOINT_ATTR_BULK,
 	.wMaxPacketSize = 64,
-	.bInterval = 0,
+	.bInterval = 1,
 }, {
 	.bLength = USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType = USB_DT_ENDPOINT,
 	.bEndpointAddress = 0x01,
 	.bmAttributes = USB_ENDPOINT_ATTR_BULK,
 	.wMaxPacketSize = 64,
-	.bInterval = 0,
-}, {
-    .bLength = USB_DT_ENDPOINT_SIZE,
-    .bDescriptorType = USB_DT_ENDPOINT,
-    .bEndpointAddress = 0x82,
-    .bmAttributes = USB_ENDPOINT_ATTR_INTERRUPT,
-    .wMaxPacketSize = 64,
-    .bInterval = 0,
+	.bInterval = 1,
 }};
 /*
 static const struct {
@@ -111,7 +105,7 @@ static const struct usb_interface_descriptor data_iface[] = {{
 	.bDescriptorType = USB_DT_INTERFACE,
 	.bInterfaceNumber = 0,
 	.bAlternateSetting = 0,
-	.bNumEndpoints = 3,
+	.bNumEndpoints = 2,
 	.bInterfaceClass = 0xFF,
 	.bInterfaceSubClass = 0,
     .bInterfaceProtocol = 0,
@@ -138,10 +132,12 @@ static const struct usb_config_descriptor config = {
 	.interface = ifaces,
 };
 
+static const char serial_str[] __attribute__ ((section (".flash"))) = "MSEM0000";
+
 static const char *usb_strings[] = {
 	"James Pallister",
 	"Medium speed energy monitor",
-	"MSEM0000",
+    serial_str,
 };
 
 int running = 0;
@@ -151,6 +147,8 @@ int head_ptr = 0, tail_ptr = 0;
 static int cdcacm_control_request(usbd_device *usbd_dev, struct usb_setup_data *req, u8 **buf,
 		u16 *len, void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
 {
+    int i;
+
 	(void)complete;
 	(void)buf;
 	(void)usbd_dev;
@@ -173,12 +171,30 @@ static int cdcacm_control_request(usbd_device *usbd_dev, struct usb_setup_data *
         *len = 0;
         break;
     }
-    case 2:
+    case 2:     // Stop
     {
         running = 0;
         timer_disable_counter(TIM2);
         adc_off(ADC1);
         *len = 0;
+        break;
+    }
+    case 3:     // Set serial
+    {
+        u32 base_addr = (u32) serial_str;
+
+        if(*len != 8)
+            return 0;
+
+        flash_unlock();
+        flash_erase_sector(FLASH_CR_SECTOR_1, FLASH_CR_PROGRAM_X32);
+        for(i = 0; i < 8 ;++i)
+        {
+            flash_program_byte(base_addr+i, (*buf)[i], FLASH_CR_PROGRAM_X8);
+        }
+        flash_program_byte(base_addr+8, 0x0, FLASH_CR_PROGRAM_X8);
+        flash_lock();
+
         break;
     }
     default:
@@ -322,7 +338,7 @@ void timer_setup()
     timer_reset(TIM3);
 	timer_set_mode(TIM3, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
 	timer_set_period(TIM3, 100);
-	timer_set_prescaler(TIM3, 168);
+	timer_set_prescaler(TIM3, 167);
 	timer_set_clock_division(TIM3, TIM_CR1_CKD_CK_INT);
 	timer_set_master_mode(TIM3, TIM_CR2_MMS_UPDATE);
     timer_enable_irq(TIM3, TIM_DIER_UIE);

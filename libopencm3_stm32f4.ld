@@ -29,15 +29,24 @@ ENTRY(reset_handler)
 
 MEMORY
 {
-	rom (rx) : ORIGIN = 0x08000000, LENGTH = 1024K
+	vecs (rx) : ORIGIN = 0x08000000, LENGTH = 16K
+	flash (rx): ORIGIN = 0x08004000, LENGTH = 16K
+	rom (rx)  : ORIGIN = 0x08008000, LENGTH = 256K
 	ram (rwx) : ORIGIN = 0x20000000, LENGTH = 128K
 }
 
 /* Define sections. */
 SECTIONS
 {
-	.text : {
+	.vecs : {
 		*(.vectors)	/* Vector table */
+	} >vecs
+
+	.flash : {
+		*(.flash*);
+	} >flash
+
+	.text : {
 		*(.text*)	/* Program code */
 		. = ALIGN(4);
 		*(.rodata*)	/* Read-only data */
@@ -67,6 +76,8 @@ SECTIONS
 		_edata = .;
 	} >ram AT >rom
 	_data_loadaddr = LOADADDR(.data);
+
+
 
 	.bss : {
 		__bss_start__ = .;

@@ -11,6 +11,9 @@ public:
     ~DataProcessor();
     void operator()();
     void endSignal();
+
+
+
 private:
     boost::mutex *mQueue;
     std::queue<boost::shared_array<unsigned char> > *dQueue;

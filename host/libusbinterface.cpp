@@ -132,7 +132,10 @@ void LibusbInterface::operator()()
     }
 
     if(devh)
-        while(!sendMonitorCommand(STOP));
+    {
+        CommandData cd = {STOP, ""};
+        while(!sendMonitorCommand(cd));
+    }
 
     close_device();
 }
@@ -282,14 +285,37 @@ void LibusbInterface::endSignal()
 void LibusbInterface::sendCommand(CommandType cmd)
 {
     boost::mutex::scoped_lock(cQueueMutex);
-    // Queue commands, because this can be from any thread
-    cQueue.push(cmd);
+    LibusbInterface::CommandData cd = {cmd, ""};
+    cQueue.push(cd);
 }
 
-bool LibusbInterface::sendMonitorCommand(CommandType cmd)
+void LibusbInterface::setSerial(string ser)
+{
+    boost::mutex::scoped_lock(cQueueMutex);
+    LibusbInterface::CommandData cd = {SETSERIAL, ser};
+    cQueue.push(cd);
+}
+
+bool LibusbInterface::sendMonitorCommand(CommandData cmd)
 {
     int r;
-    r = libusb_control_transfer(devh, 0x41, cmd, 0, 0, NULL, 0, 100);
+
+    if(cmd.cmd == SETSERIAL)
+    {
+        unsigned char data[8] = {0};
+        int len = cmd.cmd_data.length();
+
+        if(len > 8)
+            len = 8;
+
+        memcpy(data, cmd.cmd_data.c_str(), len);
+
+        r = libusb_control_transfer(devh, 0x41, cmd.cmd, 0, 0, data, len, 3000);
+    }
+    else
+    {
+        r = libusb_control_transfer(devh, 0x41, cmd.cmd, 0, 0, NULL, 0, 100);
+    }
 
     if(r < 0)
     {
@@ -297,13 +323,13 @@ bool LibusbInterface::sendMonitorCommand(CommandType cmd)
         return false;
     }
 
-    if(cmd == STOP)
+    if(cmd.cmd == STOP)
     {
         if(running)
             libusb_cancel_transfer(energy_transfer);
         running = false;
     }
-    if(cmd == START)
+    if(cmd.cmd == START)
     {
         if(!running)
             libusb_submit_transfer(energy_transfer);
