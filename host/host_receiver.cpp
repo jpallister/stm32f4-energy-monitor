@@ -90,7 +90,7 @@ void processCommand(string input)
         }
 
         dQueue.reset(new queue<shared_array<unsigned char> >());
-        liObj.reset(new LibusbInterface(&bmutex, dQueue.get(), getpid(), 0x1337, 0x1337, chosen_serial));
+        liObj.reset(new LibusbInterface(&bmutex, dQueue.get(), 0x1337, 0x1337, chosen_serial));
         dpObj.reset(new DataProcessor(&bmutex, dQueue.get()));
 
         thread1 = boost::thread(bind(&LibusbInterface::operator(),liObj.get()));  // Bind prevents copying obj (need to keep ptr)

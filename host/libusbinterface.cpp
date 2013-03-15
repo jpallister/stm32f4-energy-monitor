@@ -16,7 +16,6 @@ LibusbInterface::LibusbInterface(boost::mutex *m, queue<shared_array<unsigned ch
 {
     mQueue = m;
     dQueue = d;
-    main_thread = tid;
     this->idVendor = idVendor;
     this->idProduct = idProduct;
     this->serialId = serialId;
