@@ -153,12 +153,12 @@ static int cdcacm_control_request(usbd_device *usbd_dev, struct usb_setup_data *
             return 0;
 
         flash_unlock();
-        flash_erase_sector(FLASH_SECTOR_1, FLASH_PROGRAM_X32);
+        flash_erase_sector(FLASH_CR_SECTOR_1, FLASH_CR_PROGRAM_X32);
         for(i = 0; i < 8 ;++i)
         {
-            flash_program_byte(base_addr+i, (*buf)[i], FLASH_PROGRAM_X8);
+            flash_program_byte(base_addr+i, (*buf)[i], FLASH_CR_PROGRAM_X8);
         }
-        flash_program_byte(base_addr+8, 0x0, FLASH_PROGRAM_X8);
+        flash_program_byte(base_addr+8, 0x0, FLASH_CR_PROGRAM_X8);
         flash_lock();
 
         break;
