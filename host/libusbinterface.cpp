@@ -35,6 +35,8 @@ std::vector<std::pair<std::string, std::string> > LibusbInterface::listDevices(u
     ssize_t cnt;
     vector<pair<string,string> > devlist;
 
+    libusb_set_debug(NULL,3);
+
     cnt = libusb_get_device_list(NULL, &devs);
     if (cnt < 0)
     {
@@ -102,7 +104,6 @@ void LibusbInterface::operator()()
         printf("Couldn't allocate a transfer\n");
         return;
     }
-
 
     libusb_fill_bulk_transfer(energy_transfer, devh, (1 | LIBUSB_ENDPOINT_IN), data_buf, sizeof(data_buf), &LibusbInterface::transfer_callback, this, 100);
     libusb_fill_interrupt_transfer(interrupt_transfer, devh, (2 | LIBUSB_ENDPOINT_IN), interrupt_buf, sizeof(interrupt_buf), &LibusbInterface::interrupt_callback, this, 0);
@@ -269,11 +270,13 @@ void LIBUSB_CALL LibusbInterface::transfer_callback(struct libusb_transfer *tran
 
     if(transfer->status == LIBUSB_TRANSFER_TIMED_OUT)
     {
+        printf("Transfer timeout, rescheduling\n");
+
         if((r=libusb_submit_transfer(transfer)) < 0)
         {
-            printf("Submit transfer error: %d\n", r);
-            return;
+            printf("Transfer submit error: %d\n", r);
         }
+        return;
     }
 
     if(transfer->status != LIBUSB_TRANSFER_COMPLETED)
@@ -305,17 +308,30 @@ void LIBUSB_CALL LibusbInterface::interrupt_callback(struct libusb_transfer *tra
     LibusbInterface * _this = (LibusbInterface*)transfer->user_data;
     int r;
 
+    if(transfer->status == LIBUSB_TRANSFER_TIMED_OUT || transfer->status == 1)
+    {
+        printf("ITransfer timeout, rescheduling\n");
+
+        if((r=libusb_submit_transfer(transfer)) < 0)
+        {
+            printf("Transfer submit error: %d\n", r);
+        }
+        return;
+    }
+
     if(transfer->status != LIBUSB_TRANSFER_COMPLETED)
     {
         if(transfer->status == LIBUSB_TRANSFER_CANCELLED)
             return;
-        printf("Transfer status: %d\n", transfer->status);
+        printf("ITransfer status: %d\n", transfer->status);
         // libusb_free_transfer(transfer);
         // _this->interrupt_transfer = NULL;
         return;
     }
 
-    printf("Interrupt transfer\n");
+    printf("Interrupt transfer %c%c%c%c\n",_this->interrupt_buf[0],
+        _this->interrupt_buf[1],
+        _this->interrupt_buf[2],_this->interrupt_buf[3]);
     if((r=libusb_submit_transfer(transfer)) < 0)
     {
         printf("Submit transfer error: %d\n", r);

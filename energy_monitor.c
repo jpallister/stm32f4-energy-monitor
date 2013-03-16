@@ -197,7 +197,8 @@ static void usbdev_set_config(usbd_device *usbd_dev, u16 wValue)
 	(void)wValue;
 
 	usbd_ep_setup(usbd_dev, 0x01, USB_ENDPOINT_ATTR_BULK, 64, usbdev_data_rx_cb);
-	usbd_ep_setup(usbd_dev, 0x81, USB_ENDPOINT_ATTR_BULK, 64, NULL);
+    usbd_ep_setup(usbd_dev, 0x81, USB_ENDPOINT_ATTR_BULK, 64, NULL);
+	usbd_ep_setup(usbd_dev, 0x82, USB_ENDPOINT_ATTR_INTERRUPT, 64, NULL);
 
 	usbd_register_control_callback(
 				usbd_dev,
@@ -352,7 +353,9 @@ int main(void)
 
 	while (1)
 	{
+
         usbd_poll(usbd_dev);
+
 
         if(head_ptr == tail_ptr)
             continue;
@@ -367,6 +370,7 @@ int main(void)
             if(sent_counter < NUM_BUFFERS*2)
                 sent_counter++;
         }
+
 	}
 }
 
@@ -439,12 +443,13 @@ void tim3_isr()
     TIM_SR(TIM3) &= ~TIM_SR_UIF;
     if(gpio_get(GPIOA, GPIO0))
     {
-        char dbuf[4];
-
         gpio_toggle(GPIOD, GPIO12);
         timer_disable_counter(TIM3);
         status = -1;
-        usbd_ep_write_packet(usbd_dev, 0x82, dbuf, 4);
+        {
+            char dbuf[4] = {'a', 'b', 'c', 'd'};
+            usbd_ep_write_packet(usbd_dev, 0x82, dbuf, 4);
+        }
     }
 }
 
