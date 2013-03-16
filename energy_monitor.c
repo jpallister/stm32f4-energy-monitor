@@ -1,22 +1,3 @@
-/*
- * This file is part of the libopencm3 project.
- *
- * Copyright (C) 2010 Gareth McMullin <gareth@blacksphere.co.nz>
- *
- * This library is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with this library.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #include <stdlib.h>
 #include <libopencm3/stm32/f4/rcc.h>
 #include <libopencm3/stm32/f4/gpio.h>
@@ -110,7 +91,7 @@ int running = 0;
 int head_ptr = 0, tail_ptr = 0;
 // char globbuf[2] = {0xAB, 0xCD};
 
-static int cdcacm_control_request(usbd_device *usbd_dev, struct usb_setup_data *req, u8 **buf,
+static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *req, u8 **buf,
 		u16 *len, void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
 {
     int i;
@@ -169,7 +150,7 @@ static int cdcacm_control_request(usbd_device *usbd_dev, struct usb_setup_data *
 	return 1;
 }
 
-static void cdcacm_data_rx_cb(usbd_device *usbd_dev, u8 ep)
+static void usbdev_data_rx_cb(usbd_device *usbd_dev, u8 ep)
 {
 	(void)ep;
 
@@ -204,18 +185,18 @@ static void usb_reset_cb()
     running = 0;
 }
 
-static void cdcacm_set_config(usbd_device *usbd_dev, u16 wValue)
+static void usbdev_set_config(usbd_device *usbd_dev, u16 wValue)
 {
 	(void)wValue;
 
-	usbd_ep_setup(usbd_dev, 0x01, USB_ENDPOINT_ATTR_BULK, 64, cdcacm_data_rx_cb);
+	usbd_ep_setup(usbd_dev, 0x01, USB_ENDPOINT_ATTR_BULK, 64, usbdev_data_rx_cb);
 	usbd_ep_setup(usbd_dev, 0x81, USB_ENDPOINT_ATTR_BULK, 64, NULL);
 
 	usbd_register_control_callback(
 				usbd_dev,
 				USB_REQ_TYPE_VENDOR | USB_REQ_TYPE_INTERFACE,
 				USB_REQ_TYPE_TYPE | USB_REQ_TYPE_RECIPIENT,
-				cdcacm_control_request);
+				usbdev_control_request);
 
     usbd_register_reset_callback(usbd_dev, usb_reset_cb);
 }
@@ -360,7 +341,7 @@ int main(void)
 
 
 	usbd_dev = usbd_init(&otgfs_usb_driver, &dev, &config, usb_strings, 3);
-	usbd_register_set_config_callback(usbd_dev, cdcacm_set_config);
+	usbd_register_set_config_callback(usbd_dev, usbdev_set_config);
 
 	while (1)
 	{
