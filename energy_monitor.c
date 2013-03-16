@@ -45,6 +45,13 @@ static const struct usb_endpoint_descriptor data_endp[] = {{
 	.bmAttributes = USB_ENDPOINT_ATTR_BULK,
 	.wMaxPacketSize = 64,
 	.bInterval = 1,
+}, {
+    .bLength = USB_DT_ENDPOINT_SIZE,
+    .bDescriptorType = USB_DT_ENDPOINT,
+    .bEndpointAddress = 0x82,
+    .bmAttributes = USB_ENDPOINT_ATTR_INTERRUPT,
+    .wMaxPacketSize = 64,
+    .bInterval = 1,
 }};
 
 static const struct usb_interface_descriptor data_iface[] = {{
@@ -52,7 +59,7 @@ static const struct usb_interface_descriptor data_iface[] = {{
 	.bDescriptorType = USB_DT_INTERFACE,
 	.bInterfaceNumber = 0,
 	.bAlternateSetting = 0,
-	.bNumEndpoints = 2,
+	.bNumEndpoints = 3,
 	.bInterfaceClass = 0xFF,
 	.bInterfaceSubClass = 0,
     .bInterfaceProtocol = 0,
@@ -432,9 +439,12 @@ void tim3_isr()
     TIM_SR(TIM3) &= ~TIM_SR_UIF;
     if(gpio_get(GPIOA, GPIO0))
     {
+        char dbuf[4];
+
         gpio_toggle(GPIOD, GPIO12);
         timer_disable_counter(TIM3);
         status = -1;
+        usbd_ep_write_packet(usbd_dev, 0x82, dbuf, 4);
     }
 }
 

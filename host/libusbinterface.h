@@ -39,6 +39,7 @@ private:
     std::string serialId;
 
     unsigned char data_buf[DATA_LEN];
+    unsigned char interrupt_buf[64];
     int total_len;
     bool running;
 
@@ -57,6 +58,8 @@ private:
     // Periodic bulk transfer of data from the device
     struct libusb_transfer *energy_transfer;
     static void LIBUSB_CALL transfer_callback(struct libusb_transfer *transfer);
+    struct libusb_transfer *interrupt_transfer;
+    static void LIBUSB_CALL interrupt_callback(struct libusb_transfer *transfer);
 
     // This class handles the sending on control information to the device
 

@@ -59,7 +59,7 @@ void DataProcessor::getData()
 {
     do {
         {
-            boost::mutex::scoped_lock(*mQueue);
+            boost::mutex::scoped_lock lock(*mQueue);
 
             if(!dQueue->empty())
             {

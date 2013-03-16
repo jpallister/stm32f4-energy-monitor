@@ -10,7 +10,7 @@ SRC += energy_monitor.c
 
 
 HLFLAGS += -lboost_thread-mt -lusb-1.0 -lreadline
-HCFLAGS += -g -O2 -std=c++11
+HCFLAGS += -g -std=c++11
 
 HOST_SRC = host/host_receiver.o host/libusbinterface.o host/dataprocessor.o host/helper.o
 
@@ -27,3 +27,6 @@ host_receiver: $(HOST_SRC) Makefile
 
 %.o : %.cpp
 	g++ -c $(HCFLAGS) $< -o $@
+
+clean:
+	rm -f host_receiver host/*.o energy_monitor

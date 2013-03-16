@@ -96,7 +96,16 @@ void LibusbInterface::operator()()
         return;
     }
 
+    interrupt_transfer = libusb_alloc_transfer(0);
+    if(!interrupt_transfer)
+    {
+        printf("Couldn't allocate a transfer\n");
+        return;
+    }
+
+
     libusb_fill_bulk_transfer(energy_transfer, devh, (1 | LIBUSB_ENDPOINT_IN), data_buf, sizeof(data_buf), &LibusbInterface::transfer_callback, this, 100);
+    libusb_fill_interrupt_transfer(interrupt_transfer, devh, (2 | LIBUSB_ENDPOINT_IN), interrupt_buf, sizeof(interrupt_buf), &LibusbInterface::interrupt_callback, this, 0);
 
     // if(status == 0)
     //     sendCommand(START);
@@ -126,11 +135,14 @@ void LibusbInterface::operator()()
             total_len = 0;
         }
 
-        if(!cQueue.empty())
         {
-            boost::mutex::scoped_lock(cQueueMutex);
-            if(sendMonitorCommand(cQueue.front()))
-                cQueue.pop();
+            boost::mutex::scoped_lock lock(cQueueMutex);
+            if(!cQueue.empty())
+            {
+                CommandData cd = cQueue.front();
+                if(sendMonitorCommand(cd))
+                    cQueue.pop();
+            }
         }
     }
 
@@ -244,7 +256,7 @@ void LibusbInterface::close_device()
 
 void LibusbInterface::send_data(shared_array<unsigned char> data)
 {
-    boost::mutex::scoped_lock(*mQueue);
+    boost::mutex::scoped_lock lock(*mQueue);
 
     dQueue->push(data);
 }
@@ -255,13 +267,22 @@ void LIBUSB_CALL LibusbInterface::transfer_callback(struct libusb_transfer *tran
     LibusbInterface * _this = (LibusbInterface*)transfer->user_data;
     int r;
 
+    if(transfer->status == LIBUSB_TRANSFER_TIMED_OUT)
+    {
+        if((r=libusb_submit_transfer(transfer)) < 0)
+        {
+            printf("Submit transfer error: %d\n", r);
+            return;
+        }
+    }
+
     if(transfer->status != LIBUSB_TRANSFER_COMPLETED)
     {
         if(transfer->status == LIBUSB_TRANSFER_CANCELLED)
             return;
         printf("Transfer status: %d\n", transfer->status);
-        libusb_free_transfer(transfer);
-        _this->energy_transfer = NULL;
+        // libusb_free_transfer(transfer);
+        // _this->energy_transfer = NULL;
         return;
     }
 
@@ -279,6 +300,28 @@ void LIBUSB_CALL LibusbInterface::transfer_callback(struct libusb_transfer *tran
         return;
     }
 }
+void LIBUSB_CALL LibusbInterface::interrupt_callback(struct libusb_transfer *transfer)
+{
+    LibusbInterface * _this = (LibusbInterface*)transfer->user_data;
+    int r;
+
+    if(transfer->status != LIBUSB_TRANSFER_COMPLETED)
+    {
+        if(transfer->status == LIBUSB_TRANSFER_CANCELLED)
+            return;
+        printf("Transfer status: %d\n", transfer->status);
+        // libusb_free_transfer(transfer);
+        // _this->interrupt_transfer = NULL;
+        return;
+    }
+
+    printf("Interrupt transfer\n");
+    if((r=libusb_submit_transfer(transfer)) < 0)
+    {
+        printf("Submit transfer error: %d\n", r);
+        return;
+    }
+}
 
 void LibusbInterface::endSignal()
 {
@@ -287,14 +330,14 @@ void LibusbInterface::endSignal()
 
 void LibusbInterface::sendCommand(CommandType cmd)
 {
-    boost::mutex::scoped_lock(cQueueMutex);
+    boost::mutex::scoped_lock lock(cQueueMutex);
     LibusbInterface::CommandData cd = {cmd, ""};
     cQueue.push(cd);
 }
 
 void LibusbInterface::setSerial(string ser)
 {
-    boost::mutex::scoped_lock(cQueueMutex);
+    boost::mutex::scoped_lock lock(cQueueMutex);
     LibusbInterface::CommandData cd = {SETSERIAL, ser};
     cQueue.push(cd);
 }
@@ -329,13 +372,19 @@ bool LibusbInterface::sendMonitorCommand(CommandData cmd)
     if(cmd.cmd == STOP)
     {
         if(running)
+        {
             libusb_cancel_transfer(energy_transfer);
+            libusb_cancel_transfer(interrupt_transfer);
+        }
         running = false;
     }
     if(cmd.cmd == START)
     {
         if(!running)
+        {
             libusb_submit_transfer(energy_transfer);
+            libusb_submit_transfer(interrupt_transfer);
+        }
         running = true;
     }
 
