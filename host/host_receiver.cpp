@@ -141,6 +141,18 @@ void processCommand(string input)
     {
         liObj->sendCommand(LibusbInterface::STOP);
     }
+    else if(args[0] == "power")
+    {
+        if(args.size() < 2)
+        {
+            dpObj->setAccumulation(true);
+            return;
+        }
+        if(args[1] == "on")
+            dpObj->setAccumulation(true);
+        else
+            dpObj->setAccumulation(false);
+    }
     else if(args[0] == "help")
     {
         cout << "Help" << endl;

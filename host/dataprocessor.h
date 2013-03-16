@@ -12,8 +12,7 @@ public:
     void operator()();
     void endSignal();
 
-
-
+    void setAccumulation(bool);
 private:
     boost::mutex *mQueue;
     std::queue<boost::shared_array<unsigned char> > *dQueue;
@@ -26,6 +25,10 @@ private:
 
     FILE *output;
     unsigned long cur_time;
+
+    bool doAccumulation;
+    unsigned long long total;
+    unsigned count;
 };
 
 #endif

@@ -26,7 +26,6 @@ LibusbInterface::LibusbInterface(boost::mutex *m, queue<shared_array<unsigned ch
 
 LibusbInterface::~LibusbInterface()
 {
-    printf("Destructr\n");
 }
 
 std::vector<std::pair<std::string, std::string> > LibusbInterface::listDevices(unsigned idVendor, unsigned idProduct)
@@ -120,9 +119,9 @@ void LibusbInterface::operator()()
 
         if(t2 - t1 >= 2)
         {
-            mt_start_output();
-            printf("%f\n", (float)total_len/(t2-t1));
-            mt_end_output();
+            // mt_start_output();
+            // printf("%f\n", (float)total_len/(t2-t1));
+            // mt_end_output();
             t1=t2;
             total_len = 0;
         }

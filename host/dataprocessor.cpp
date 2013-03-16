@@ -3,6 +3,7 @@
 #include "dataprocessor.h"
 #include <time.h>
 #include "libusbinterface.h"
+#include "helper.h"
 
 using namespace boost;
 
@@ -13,17 +14,22 @@ DataProcessor::DataProcessor(boost::mutex *m, std::queue<boost::shared_array<uns
     status = 0;
     output = fopen("output_results", "w");
     cur_time = 0;
+    total = 0;
+    count = 0;
+    doAccumulation = false;
 }
 
 DataProcessor::~DataProcessor()
 {
     if(output)
+    {
         fclose(output);
+        output = NULL;
+    }
 }
 
 void DataProcessor::operator()()
 {
-    int total = 0;
     int t1, t2;
 
     t1 = time(0);
@@ -33,15 +39,18 @@ void DataProcessor::operator()()
         if(status != 0)
             continue;
         processData();
-        total += DATA_LEN;
         // printf("gda\n");
 
         t2 = time(0);
-        if(t2 - t1 >= 2)
+        if(t2 - t1 >= 2 && doAccumulation)
         {
-            // printf("D %f\n",(float)total/(t2-t1));
+            mt_start_output();
+            printf("%3.1f\n",(float)total/count);
+            mt_end_output();
+
             t1 = t2;
             total = 0;
+            count = 0;
         }
     }
 }
@@ -106,6 +115,9 @@ void DataProcessor::processData()
             cur_time += rate;
             fprintf(output, "%d %lu\n", b2, cur_time);
             cur_time += rate;
+
+            total += b1 + b2;
+            count += 2;
         }
     }
 }
@@ -113,4 +125,10 @@ void DataProcessor::processData()
 void DataProcessor::endSignal()
 {
     status = 1;
+}
+
+
+void DataProcessor::setAccumulation(bool sa)
+{
+    doAccumulation = sa;
 }
