@@ -19,8 +19,8 @@ using namespace boost;
 
 boost::mutex bmutex;
 scoped_ptr<queue<shared_array<unsigned char> > > dQueue;
-scoped_ptr<LibusbInterface> liObj;
-scoped_ptr<DataProcessor> dpObj;
+LibusbInterface *liObj;
+DataProcessor *dpObj;
 boost::thread thread1, thread2;
 bool running = true;
 string chosen_serial;
@@ -87,14 +87,16 @@ void processCommand(string input)
             connected = false;
             thread1.join();
             thread2.join();
+            delete liObj;
+            delete dpObj;
         }
 
         dQueue.reset(new queue<shared_array<unsigned char> >());
-        liObj.reset(new LibusbInterface(&bmutex, dQueue.get(), 0x1337, 0x1337, chosen_serial));
-        dpObj.reset(new DataProcessor(&bmutex, dQueue.get()));
+        liObj = new LibusbInterface(&bmutex, dQueue.get(), 0x1337, 0x1337, chosen_serial);
+        dpObj = new DataProcessor(&bmutex, dQueue.get());
 
-        thread1 = boost::thread(bind(&LibusbInterface::operator(),liObj.get()));  // Bind prevents copying obj (need to keep ptr)
-        thread2 = boost::thread(bind(&DataProcessor::operator(),dpObj.get()));
+        thread1 = boost::thread(bind(&LibusbInterface::operator(),liObj));  // Bind prevents copying obj (need to keep ptr)
+        thread2 = boost::thread(bind(&DataProcessor::operator(),dpObj));
 
         connected = true;
         cout << "    Connected to device, serial: " << chosen_serial << endl;
@@ -180,6 +182,10 @@ void processCommand(string input)
             liObj->endSignal();
             dpObj->endSignal();
             connected = false;
+            thread1.join();
+            thread2.join();
+            delete liObj;
+            delete dpObj;
         }
         running = false;
     }
@@ -214,9 +220,6 @@ int main()
         add_history(input);
         free(input);
     }
-
-    thread1.join();
-    thread2.join();
 
     printf("Complete\n");
 
