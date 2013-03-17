@@ -96,7 +96,45 @@ static const char *usb_strings[] = {
 
 int running = 0;
 int head_ptr = 0, tail_ptr = 0;
-// char globbuf[2] = {0xAB, 0xCD};
+int trigger_port = -1, trigger_pin = -1;
+
+void exti_setup()
+{
+    nvic_disable_irq(NVIC_EXTI0_IRQ);
+    nvic_disable_irq(NVIC_EXTI1_IRQ);
+    nvic_disable_irq(NVIC_EXTI2_IRQ);
+    nvic_disable_irq(NVIC_EXTI3_IRQ);
+    nvic_disable_irq(NVIC_EXTI4_IRQ);
+    nvic_disable_irq(NVIC_EXTI9_5_IRQ);
+    nvic_disable_irq(NVIC_EXTI15_10_IRQ);
+
+    if(trigger_port == -1)
+        return;
+
+    exti_select_source(trigger_pin, trigger_port);
+    exti_set_trigger(trigger_pin, EXTI_TRIGGER_BOTH);
+    exti_enable_request(trigger_pin);
+
+    switch(trigger_pin)
+    {
+        case 1<<0: nvic_enable_irq(NVIC_EXTI0_IRQ); break;
+        case 1<<1: nvic_enable_irq(NVIC_EXTI1_IRQ); break;
+        case 1<<2: nvic_enable_irq(NVIC_EXTI2_IRQ); break;
+        case 1<<3: nvic_enable_irq(NVIC_EXTI3_IRQ); break;
+        case 1<<4: nvic_enable_irq(NVIC_EXTI4_IRQ); break;
+        case 1<<5:
+        case 1<<6:
+        case 1<<7:
+        case 1<<8:
+        case 1<<9: nvic_enable_irq(NVIC_EXTI9_5_IRQ); break;
+        case 1<<10:
+        case 1<<11:
+        case 1<<12:
+        case 1<<13:
+        case 1<<14:
+        case 1<<15: nvic_enable_irq(NVIC_EXTI15_10_IRQ); break;
+    }
+}
 
 static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *req, u8 **buf,
 		u16 *len, void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
@@ -149,6 +187,29 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
         flash_program_byte(base_addr+8, 0x0, FLASH_CR_PROGRAM_X8);
         flash_lock();
 
+        break;
+    }
+    case 4:     // Set Trigger
+    {
+        if(*len != 2)
+            return 0;
+
+        switch((*buf)[0])
+        {
+            case 'A': trigger_port = GPIOA; break;
+            case 'B': trigger_port = GPIOB; break;
+            case 'C': trigger_port = GPIOC; break;
+            case 'D': trigger_port = GPIOD; break;
+            case 'E': trigger_port = GPIOE; break;
+            case 'F': trigger_port = GPIOF; break;
+            case 'G': trigger_port = GPIOG; break;
+            case 'H': trigger_port = GPIOH; break;
+            default:
+                trigger_port = -1; break;
+        }
+
+        trigger_pin = 1 << (*buf)[1];
+        exti_setup();
         break;
     }
     default:
@@ -297,13 +358,8 @@ void adc_setup()
 	adc_power_on(ADC1);
 }
 
-void exti_setup()
+void exti_timer_setup()
 {
-    exti_select_source(EXTI0, GPIOA);
-    exti_set_trigger(EXTI0, EXTI_TRIGGER_BOTH);
-    exti_enable_request(EXTI0);
-    nvic_enable_irq(NVIC_EXTI0_IRQ);
-
     // Timer is used for deboucing
     // If output on trigger is the same 30ms later, accept as input
     rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_TIM3EN);
@@ -317,11 +373,11 @@ void exti_setup()
 
     nvic_set_priority(NVIC_TIM3_IRQ, 0);
     nvic_enable_irq(NVIC_TIM3_IRQ);
-
 }
 
 usbd_device *usbd_dev;
 
+int send_int = 0;
 
 int main(void)
 {
@@ -343,7 +399,7 @@ int main(void)
     dma_setup();
 	adc_setup();
 	timer_setup();
-    exti_setup();
+    exti_timer_setup();
 
 	gpio_toggle(GPIOA, GPIO12);
 
@@ -356,6 +412,12 @@ int main(void)
 
         usbd_poll(usbd_dev);
 
+        if(send_int)
+        {
+            char dbuf[4] = {'a', 'b', 'c', 'd'};
+            usbd_ep_write_packet(usbd_dev, 0x82, dbuf, 4);
+            send_int = 0;
+        }
 
         if(head_ptr == tail_ptr)
             continue;
@@ -446,10 +508,7 @@ void tim3_isr()
         gpio_toggle(GPIOD, GPIO12);
         timer_disable_counter(TIM3);
         status = -1;
-        {
-            char dbuf[4] = {'a', 'b', 'c', 'd'};
-            usbd_ep_write_packet(usbd_dev, 0x82, dbuf, 4);
-        }
+        send_int = 1;
     }
 }
 

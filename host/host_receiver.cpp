@@ -131,6 +131,11 @@ void processCommand(string input)
             cout << "Command expects parameters" << endl;
             return;
         }
+        if(args[1] == "none")
+        {
+            cout << "    Removing trigger" << endl;
+            liObj->setTrigger(0xFF, 0);
+        }
 
         smatch sm;
         regex rx("P([A-H])(\\d{1,2})");
@@ -141,7 +146,10 @@ void processCommand(string input)
             if(pinnum > 16)
                 cout << "Pin number should be 0-15";
             else
-                cout << sm[1] << " " << sm[2] << endl;
+            {
+                cout << "    Setting trigger to port P" << sm[1] << sm[2] << endl;
+                liObj->setTrigger(sm[1].str()[0], pinnum);
+            }
         }
         else
         {
@@ -184,7 +192,9 @@ void processCommand(string input)
         cout << "    leds                        Toggle the LEDs" << endl;
         cout << "    start                       Start energy measurement" << endl;
         cout << "    stop                        Stop energy measurement" << endl;
-        cout << "    trigger PIN                 Trigger measurement on PIN (e.g PA0)" << endl;
+        cout << "    trigger" << endl;
+        cout << "             PIN                 Trigger measurement on PIN (e.g PA0)" << endl;
+        cout << "             none                Remove trigger" << endl;
         cout << "    mode " << endl;
         cout << "             normal" << endl;
         cout << "             dual" << endl;

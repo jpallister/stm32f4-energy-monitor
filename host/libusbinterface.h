@@ -23,11 +23,13 @@ public:
         LED = 0,
         START = 1,
         STOP = 2,
-        SETSERIAL = 3
+        SETSERIAL = 3,
+        SETTRIGGER = 4
     };
 
     void sendCommand(CommandType);
     void setSerial(std::string);
+    void setTrigger(char, int);
 
 private:
     boost::mutex *mQueue;

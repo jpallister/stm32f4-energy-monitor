@@ -108,6 +108,8 @@ void LibusbInterface::operator()()
     libusb_fill_bulk_transfer(energy_transfer, devh, (1 | LIBUSB_ENDPOINT_IN), data_buf, sizeof(data_buf), &LibusbInterface::transfer_callback, this, 100);
     libusb_fill_interrupt_transfer(interrupt_transfer, devh, (2 | LIBUSB_ENDPOINT_IN), interrupt_buf, sizeof(interrupt_buf), &LibusbInterface::interrupt_callback, this, 0);
 
+    libusb_submit_transfer(interrupt_transfer);
+
     // if(status == 0)
     //     sendCommand(START);
 
@@ -152,6 +154,8 @@ void LibusbInterface::operator()()
         CommandData cd = {STOP, ""};
         while(!sendMonitorCommand(cd));
     }
+
+    libusb_cancel_transfer(interrupt_transfer);
 
     close_device();
 }
@@ -308,7 +312,7 @@ void LIBUSB_CALL LibusbInterface::interrupt_callback(struct libusb_transfer *tra
     LibusbInterface * _this = (LibusbInterface*)transfer->user_data;
     int r;
 
-    if(transfer->status == LIBUSB_TRANSFER_TIMED_OUT || transfer->status == 1)
+    if(transfer->status == LIBUSB_TRANSFER_TIMED_OUT)
     {
         printf("ITransfer timeout, rescheduling\n");
 
@@ -358,6 +362,14 @@ void LibusbInterface::setSerial(string ser)
     cQueue.push(cd);
 }
 
+void LibusbInterface::setTrigger(char port, int pinnum)
+{
+    boost::mutex::scoped_lock lock(cQueueMutex);
+    char data[3] = {port, char(pinnum), 0};
+    LibusbInterface::CommandData cd = {SETTRIGGER, data};
+    cQueue.push(cd);
+}
+
 bool LibusbInterface::sendMonitorCommand(CommandData cmd)
 {
     int r;
@@ -373,6 +385,15 @@ bool LibusbInterface::sendMonitorCommand(CommandData cmd)
         memcpy(data, cmd.cmd_data.c_str(), len);
 
         r = libusb_control_transfer(devh, 0x41, cmd.cmd, 0, 0, data, len, 3000);
+    }
+    else if(cmd.cmd == SETTRIGGER)
+    {
+        unsigned char data[2] = {0};
+        int len = 2;
+
+        memcpy(data, cmd.cmd_data.c_str(), 2);
+
+        r = libusb_control_transfer(devh, 0x41, cmd.cmd, 0, 0, data, len, 300);
     }
     else
     {
@@ -390,7 +411,6 @@ bool LibusbInterface::sendMonitorCommand(CommandData cmd)
         if(running)
         {
             libusb_cancel_transfer(energy_transfer);
-            libusb_cancel_transfer(interrupt_transfer);
         }
         running = false;
     }
@@ -399,7 +419,6 @@ bool LibusbInterface::sendMonitorCommand(CommandData cmd)
         if(!running)
         {
             libusb_submit_transfer(energy_transfer);
-            libusb_submit_transfer(interrupt_transfer);
         }
         running = true;
     }
