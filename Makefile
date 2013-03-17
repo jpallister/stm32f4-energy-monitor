@@ -9,7 +9,7 @@ FLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 SRC += energy_monitor.c
 
 
-HLFLAGS += -lboost_thread-mt -lusb-1.0 -lreadline
+HLFLAGS += -lboost_thread-mt -lusb-1.0 -lreadline -lboost_regex-mt
 HCFLAGS += -g -std=c++11
 
 HOST_SRC = host/host_receiver.o host/libusbinterface.o host/dataprocessor.o host/helper.o

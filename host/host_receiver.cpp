@@ -5,6 +5,7 @@
 #include <queue>
 #include <vector>
 #include <string>
+#include <boost/regex.hpp>
 #include <signal.h>
 #include <boost/bind.hpp>
 #include <boost/algorithm/string.hpp>
@@ -130,6 +131,23 @@ void processCommand(string input)
             cout << "Command expects parameters" << endl;
             return;
         }
+
+        smatch sm;
+        regex rx("P([A-H])(\\d{1,2})");
+        if(regex_match(args[1], sm, rx))
+        {
+            int pinnum = lexical_cast<int>(sm[2]);
+
+            if(pinnum > 16)
+                cout << "Pin number should be 0-15";
+            else
+                cout << sm[1] << " " << sm[2] << endl;
+        }
+        else
+        {
+            cout << "Invalid portname" << endl;
+            return;
+        }
     }
     else if(args[0] == "leds")
     {
@@ -164,9 +182,9 @@ void processCommand(string input)
         cout << "    setserial SERIAL            Set the serial number of current device" << endl;
         cout << "                                Reconnection required before new serial recognised" << endl;
         cout << "    leds                        Toggle the LEDs" << endl;
-        cout << "    trigger " << endl;
-        cout << "             (start | stop)     Start/stop the energy measurement" << endl;
-        cout << "             pin PIN            The energy measurement is started/stopped on PIN" << endl;
+        cout << "    start                       Start energy measurement" << endl;
+        cout << "    stop                        Stop energy measurement" << endl;
+        cout << "    trigger PIN                 Trigger measurement on PIN (e.g PA0)" << endl;
         cout << "    mode " << endl;
         cout << "             normal" << endl;
         cout << "             dual" << endl;
