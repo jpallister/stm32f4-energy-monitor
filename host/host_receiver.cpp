@@ -135,6 +135,7 @@ void processCommand(string input)
         {
             cout << "    Removing trigger" << endl;
             liObj->setTrigger(0xFF, 0);
+            return;
         }
 
         smatch sm;

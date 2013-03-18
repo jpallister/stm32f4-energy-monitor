@@ -107,6 +107,8 @@ void exti_setup()
     nvic_disable_irq(NVIC_EXTI4_IRQ);
     nvic_disable_irq(NVIC_EXTI9_5_IRQ);
     nvic_disable_irq(NVIC_EXTI15_10_IRQ);
+    timer_disable_counter(TIM3);
+    exti_reset_request(EXTI0);
 
     if(trigger_port == -1)
         return;
