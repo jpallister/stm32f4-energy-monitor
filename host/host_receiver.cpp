@@ -215,6 +215,31 @@ void processCommand(string input)
         else
             dpObj->setAccumulation(false);
     }
+    else if(args[0] == "mode")
+    {
+        if(!connected)
+        {
+            cout << "    Need to be connected" << endl;
+            return;
+        }
+        if(args.size() < 2)
+        {
+            cout << "Command expects parameters" << endl;
+            return;
+        }
+        if(args[1] == "normal")
+        {
+            liObj->setMode(LibusbInterface::NORMAL_ADC);
+        }
+        else if(args[1] == "dual")
+        {
+            liObj->setMode(LibusbInterface::DUAL_ADC);
+        }
+        else if(args[1] == "oversampled")
+        {
+            liObj->setMode(LibusbInterface::OVERSAMPLED_ADC);
+        }
+    }
     else if(args[0] == "help")
     {
         cout << "Help" << endl;

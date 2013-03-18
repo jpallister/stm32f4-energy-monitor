@@ -397,6 +397,14 @@ void LibusbInterface::setTrigger(char port, int pinnum)
     cQueue.push(cd);
 }
 
+void LibusbInterface::setMode(Mode m)
+{
+    boost::mutex::scoped_lock lock(cQueueMutex);
+    char data[2] = {m, 0};
+    LibusbInterface::CommandData cd = {SETTRIGGER, data};
+    cQueue.push(cd);
+}
+
 bool LibusbInterface::sendMonitorCommand(CommandData cmd)
 {
     int r;
@@ -419,6 +427,15 @@ bool LibusbInterface::sendMonitorCommand(CommandData cmd)
         int len = 2;
 
         memcpy(data, cmd.cmd_data.c_str(), 2);
+
+        r = libusb_control_transfer(devh, 0x41, cmd.cmd, 0, 0, data, len, 300);
+    }
+    else if(cmd.cmd == SETMODE)
+    {
+        unsigned char data[1] = {0};
+        int len = 1;
+
+        data[0] = cmd.cmd_data.c_str()[0];
 
         r = libusb_control_transfer(devh, 0x41, cmd.cmd, 0, 0, data, len, 300);
     }
