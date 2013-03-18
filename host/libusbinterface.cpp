@@ -333,9 +333,36 @@ void LIBUSB_CALL LibusbInterface::interrupt_callback(struct libusb_transfer *tra
         return;
     }
 
-    printf("Interrupt transfer %c%c%c%c\n",_this->interrupt_buf[0],
-        _this->interrupt_buf[1],
-        _this->interrupt_buf[2],_this->interrupt_buf[3]);
+    if(_this->interrupt_buf[0] == 1)
+    {
+        mt_start_output();
+        printf("    Start measurement interrupt received\n");
+        mt_end_output();
+        if(!_this->running)
+        {
+            libusb_submit_transfer(_this->energy_transfer);
+        }
+        _this->running = true;
+    }
+    else if(_this->interrupt_buf[0] == 2)
+    {
+        mt_start_output();
+        printf("    Stop measurement interrupt received\n");
+        mt_end_output();
+        if(_this->running)
+        {
+            libusb_cancel_transfer(_this->energy_transfer);
+        }
+        _this->running = false;
+    }
+    else
+    {
+        mt_start_output();
+        printf("Unrecognised interrupt transfer %c%c%c%c\n",_this->interrupt_buf[0],
+            _this->interrupt_buf[1], _this->interrupt_buf[2],_this->interrupt_buf[3]);
+        mt_end_output();
+    }
+
     if((r=libusb_submit_transfer(transfer)) < 0)
     {
         printf("Submit transfer error: %d\n", r);

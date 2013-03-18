@@ -136,6 +136,22 @@ void exti_setup()
     }
 }
 
+void start_measurement()
+{
+    running = 1;
+    head_ptr = 0;
+    tail_ptr = 0;
+    timer_enable_counter(TIM2);
+    adc_power_on(ADC1);
+}
+
+void stop_measurement()
+{
+    running = 0;
+    timer_disable_counter(TIM2);
+    adc_off(ADC1);
+}
+
 static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *req, u8 **buf,
 		u16 *len, void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
 {
@@ -155,19 +171,13 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
         break;
     case 1:     // Start
     {
-        running = 1;
-        head_ptr = 0;
-        tail_ptr = 0;
-        timer_enable_counter(TIM2);
-        adc_power_on(ADC1);
+        start_measurement();
         *len = 0;
         break;
     }
     case 2:     // Stop
     {
-        running = 0;
-        timer_disable_counter(TIM2);
-        adc_off(ADC1);
+        stop_measurement();
         *len = 0;
         break;
     }
@@ -378,6 +388,7 @@ void exti_timer_setup()
 usbd_device *usbd_dev;
 
 int send_int = 0;
+char interrupt_buf[4]= {0};
 
 int main(void)
 {
@@ -414,8 +425,7 @@ int main(void)
 
         if(send_int)
         {
-            char dbuf[4] = {'a', 'b', 'c', 'd'};
-            usbd_ep_write_packet(usbd_dev, 0x82, dbuf, 4);
+            usbd_ep_write_packet(usbd_dev, 0x82, interrupt_buf, 4);
             send_int = 0;
         }
 
@@ -509,6 +519,16 @@ void tim3_isr()
         timer_disable_counter(TIM3);
         status = -1;
         send_int = 1;
+        if(running == 0)
+        {
+            interrupt_buf[0] = 1;
+            start_measurement();
+        }
+        else
+        {
+            interrupt_buf[0] = 2;
+            stop_measurement();
+        }
     }
 }
 
