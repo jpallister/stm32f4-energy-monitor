@@ -4,6 +4,7 @@
 #include <time.h>
 #include "libusbinterface.h"
 #include "helper.h"
+#include <math.h>
 
 using namespace boost;
 
@@ -15,6 +16,9 @@ DataProcessor::DataProcessor(boost::mutex *m, std::queue<boost::shared_array<uns
     output = fopen("output_results", "w");
     cur_time = 0;
     total = 0;
+    sqTotal = 0;
+    min_v = 4096;
+    max_v = 0;
     count = 0;
     doAccumulation = false;
 }
@@ -45,11 +49,17 @@ void DataProcessor::operator()()
         if(t2 - t1 >= 2 && doAccumulation)
         {
             mt_start_output();
-            printf("%3.1f\n",(float)total/count);
+            printf("Avg: %4.1lf    Std:%3.1lf    Max: %4d    Min: %4d\n",(double)total/count,
+                    sqrt(((double)sqTotal/count)
+                        -((double)total*total/((double)count*count))),
+                    min_v, max_v);
             mt_end_output();
 
             t1 = t2;
             total = 0;
+            sqTotal = 0;
+            min_v = 4096;
+            max_v = 0;
             count = 0;
         }
     }
@@ -117,6 +127,15 @@ void DataProcessor::processData()
             cur_time += rate;
 
             total += b1 + b2;
+            sqTotal += (unsigned long)b1*b1 + (unsigned long)b2*b2;
+            if(b1 < min_v)
+                min_v = b1;
+            if(b2 < min_v)
+                min_v = b2;
+            if(b1 > max_v)
+                max_v = b1;
+            if(b2 > max_v)
+                max_v = b2;
             count += 2;
         }
     }

@@ -27,7 +27,8 @@ private:
     unsigned long cur_time;
 
     bool doAccumulation;
-    unsigned long long total;
+    unsigned long long total, sqTotal;
+    unsigned min_v, max_v;
     unsigned count;
 };
 
