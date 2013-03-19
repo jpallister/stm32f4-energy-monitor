@@ -149,6 +149,7 @@ void start_measurement()
     tail_ptr = 0;
     timer_enable_counter(TIM2);
     adc_power_on(ADC1);
+    adc_power_on(ADC2);
 }
 
 void stop_measurement()
@@ -156,6 +157,7 @@ void stop_measurement()
     running = 0;
     timer_disable_counter(TIM2);
     adc_off(ADC1);
+    adc_off(ADC2);
 }
 
 static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *req, u8 **buf,
@@ -346,6 +348,7 @@ void timer_setup()
 {
 	rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_TIM2EN);
 
+    timer_disable_counter(TIM2);
 	timer_reset(TIM2);
 	timer_set_mode(TIM2, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
 	timer_set_period(TIM2, tperiod>>2);
@@ -358,7 +361,7 @@ void timer_setup()
 void adc_setup()
 {
 	gpio_mode_setup(GPIOA, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO1 | GPIO2);
-	rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_ADC1EN);
+    rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_ADC1EN);
 	adc_set_clk_prescale(0);
 	adc_set_single_conversion_mode(ADC1);
     adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR1_SMP_1DOT5CYC);
@@ -380,6 +383,43 @@ void adc_setup()
 	adc_set_right_aligned(ADC1);
 	adc_set_multi_mode(ADC_CCR_MULTI_INDEPENDENT);
 	adc_power_on(ADC1);
+}
+
+void adc_setup_dual()
+{
+    gpio_mode_setup(GPIOA, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO1 | GPIO2);
+    rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_ADC1EN);
+    rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_ADC2EN);
+    adc_set_clk_prescale(0);
+    adc_set_single_conversion_mode(ADC1);
+    adc_set_single_conversion_mode(ADC2);
+    adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR1_SMP_1DOT5CYC);
+    adc_set_sample_time(ADC2, ADC_CHANNEL2, ADC_SMPR1_SMP_1DOT5CYC);
+
+    u8 channels1[] = {ADC_CHANNEL1};
+    u8 channels2[] = {ADC_CHANNEL2};
+    adc_set_regular_sequence(ADC1, 1, channels1);
+    adc_set_regular_sequence(ADC2, 1, channels2);
+
+    adc_set_resolution(ADC1, ADC_CR1_RES_12BIT);
+    adc_set_resolution(ADC2, ADC_CR1_RES_12BIT);
+
+    adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
+    adc_enable_external_trigger_regular(ADC2,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
+
+    adc_enable_dma(ADC1);
+    adc_enable_dma(ADC2);
+    adc_set_dma_continue(ADC1);
+    adc_set_dma_continue(ADC2);
+
+    ADC_CCR |= ADC_CCR_DMA_MODE_1 | ADC_CCR_DDS;
+
+    adc_set_right_aligned(ADC1);
+    adc_set_right_aligned(ADC2);
+    adc_set_multi_mode(ADC_CCR_MULTI_DUAL_REG_SIMUL_AND_INJECTED_SIMUL);
+    adc_power_on(ADC1);
+    adc_power_on(ADC2);
+
 }
 
 void exti_timer_setup()
@@ -422,7 +462,7 @@ int main(void)
 	gpio_set_af(GPIOA, GPIO_AF10, GPIO9 | GPIO11 | GPIO12);
 
     dma_setup();
-	adc_setup();
+	adc_setup_dual();
 	timer_setup();
     exti_timer_setup();
 
