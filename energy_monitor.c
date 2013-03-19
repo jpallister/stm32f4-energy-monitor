@@ -102,6 +102,8 @@ int running = 0;
 int head_ptr = 0, tail_ptr = 0;
 int trigger_port = -1, trigger_pin = -1;
 
+int adc_mode = REGULAR_ADC;
+
 void exti_setup()
 {
     nvic_disable_irq(NVIC_EXTI0_IRQ);
@@ -326,7 +328,11 @@ void dma_setup()
 {
     dma_stream_reset(DMA2, DMA_STREAM0);
 
-    dma_set_peripheral_address(DMA2, DMA_STREAM0, (u32)&ADC1_DR);
+    if(adc_mode == REGULAR_ADC)
+        dma_set_peripheral_address(DMA2, DMA_STREAM0, (u32)&ADC1_DR);
+    else
+        dma_set_peripheral_address(DMA2, DMA_STREAM0, (u32)&ADC_CDR);
+
     dma_set_memory_address(DMA2, DMA_STREAM0, (u32)&dbuf0);
     dma_set_number_of_data(DMA2, DMA_STREAM0, DATA_BUF_SHORTS);
     dma_set_transfer_mode(DMA2, DMA_STREAM0, DMA_SxCR_DIR_PERIPHERAL_TO_MEM);
@@ -341,7 +347,7 @@ void dma_setup()
 
     dma_enable_transfer_complete_interrupt(DMA2, DMA_STREAM0);
 
-    nvic_set_priority(NVIC_DMA2_STREAM0_IRQ, 3);
+    nvic_set_priority(NVIC_DMA2_STREAM0_IRQ, 1);
     nvic_enable_irq(NVIC_DMA2_STREAM0_IRQ);
     dma_enable_stream(DMA2, DMA_STREAM0);
 }
@@ -407,7 +413,8 @@ void adc_setup_dual()
     adc_set_resolution(ADC2, ADC_CR1_RES_12BIT);
 
     adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
-    adc_enable_external_trigger_regular(ADC2,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
+    adc_disable_external_trigger_regular(ADC2);
+    // adc_enable_external_trigger_regular(ADC2,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
 
     adc_enable_dma(ADC1);
     adc_enable_dma(ADC2);
@@ -473,8 +480,10 @@ int main(void)
 	gpio_mode_setup(GPIOD, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO15 | GPIO14 | GPIO13 | GPIO12);
 	gpio_set_af(GPIOA, GPIO_AF10, GPIO9 | GPIO11 | GPIO12);
 
+    adc_mode = DUAL_ADC;
     dma_setup();
-	adc_setup_dual();
+    adc_setup_dual();
+	// adc_setup();
 	timer_setup();
     exti_timer_setup();
 
@@ -522,6 +531,8 @@ void dma2_stream0_isr()
     if((DMA2_LISR & DMA_LISR_TCIF0) != 0)
     {
         dma_clear_interrupt_flags(DMA2, DMA_STREAM0, DMA_LISR_TCIF0);
+        gpio_toggle(GPIOD, GPIO14);
+
 
         nhead = (head_ptr+1);
         if(nhead >= NUM_BUFFERS)
