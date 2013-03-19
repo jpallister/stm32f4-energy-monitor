@@ -98,6 +98,9 @@ static const char *usb_strings[] = {
     serial_str,
 };
 
+void dma_setup();
+void adc_setup();
+
 int running = 0;
 int head_ptr = 0, tail_ptr = 0;
 int trigger_port = -1, trigger_pin = -1;
@@ -153,7 +156,8 @@ void start_measurement()
     tail_ptr = 0;
     timer_enable_counter(TIM2);
     adc_power_on(ADC1);
-    adc_power_on(ADC2);
+    if(adc_mode == DUAL_ADC)
+        adc_power_on(ADC2);
 }
 
 void stop_measurement()
@@ -161,7 +165,8 @@ void stop_measurement()
     running = 0;
     timer_disable_counter(TIM2);
     adc_off(ADC1);
-    adc_off(ADC2);
+    if(adc_mode == DUAL_ADC)
+        adc_off(ADC2);
 }
 
 static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *req, u8 **buf,
@@ -239,7 +244,12 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
         if(*len != 1)
             return 0;
 
-        // (*buf)[0]
+        adc_mode = (*buf)[0];
+        if(adc_mode != REGULAR_ADC && adc_mode != DUAL_ADC && OVERSAMPLED_ADC)
+            adc_mode = 0;
+
+        dma_setup();
+        adc_setup();
         break;
     }
     default:
@@ -310,13 +320,16 @@ static void usbdev_set_config(usbd_device *usbd_dev, u16 wValue)
 #define HIGH_THRESH         64
 #define LOW_THRESH          960
 
+#define REGULAR_ADC_SHORTS  45
+#define DUAL_ADC_SHORTS     (42*2)
+
 typedef struct {
     unsigned char data[DATA_BUF_BYTES];
 } power_data;
 
 power_data data_bufs[NUM_BUFFERS] = {0};
 
-short dbuf0[DATA_BUF_SHORTS];
+unsigned short dbuf0[128];
 int sent_counter=0;
 
 
@@ -329,12 +342,17 @@ void dma_setup()
     dma_stream_reset(DMA2, DMA_STREAM0);
 
     if(adc_mode == REGULAR_ADC)
+    {
         dma_set_peripheral_address(DMA2, DMA_STREAM0, (u32)&ADC1_DR);
+        dma_set_number_of_data(DMA2, DMA_STREAM0, REGULAR_ADC_SHORTS);
+    }
     else
+    {
         dma_set_peripheral_address(DMA2, DMA_STREAM0, (u32)&ADC_CDR);
+        dma_set_number_of_data(DMA2, DMA_STREAM0, DUAL_ADC_SHORTS);
+    }
 
     dma_set_memory_address(DMA2, DMA_STREAM0, (u32)&dbuf0);
-    dma_set_number_of_data(DMA2, DMA_STREAM0, DATA_BUF_SHORTS);
     dma_set_transfer_mode(DMA2, DMA_STREAM0, DMA_SxCR_DIR_PERIPHERAL_TO_MEM);
     dma_enable_memory_increment_mode(DMA2, DMA_STREAM0);
     dma_set_peripheral_size(DMA2, DMA_STREAM0, DMA_SxCR_PSIZE_16BIT);
@@ -370,71 +388,62 @@ void adc_setup()
 {
 	gpio_mode_setup(GPIOA, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO1 | GPIO2);
     rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_ADC1EN);
+    rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_ADC2EN);
+    adc_off(ADC1);
+    adc_off(ADC2);
 	adc_set_clk_prescale(0);
-	adc_set_single_conversion_mode(ADC1);
+    adc_set_single_conversion_mode(ADC1);
+	adc_set_single_conversion_mode(ADC2);
     adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR1_SMP_1DOT5CYC);
-	adc_set_sample_time(ADC1, ADC_CHANNEL2, ADC_SMPR1_SMP_1DOT5CYC);
+    adc_set_sample_time(ADC1, ADC_CHANNEL2, ADC_SMPR1_SMP_1DOT5CYC);
+	adc_set_sample_time(ADC2, ADC_CHANNEL2, ADC_SMPR1_SMP_1DOT5CYC);
 
-	u8 channels[] = {ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL2};
-	adc_set_regular_sequence(ADC1, 3, channels);
-    adc_enable_scan_mode(ADC1);
-    adc_enable_discontinuous_mode_regular(ADC1, ADC_CR1_DISCNUM_1CHANNELS);
+    if(adc_mode == REGULAR_ADC)
+    {
+	    u8 channels[] = {ADC_CHANNEL2, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1,
+            ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1,
+            ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1};
+	    adc_set_regular_sequence(ADC1, 15, channels);
+        adc_enable_scan_mode(ADC1);
+        adc_enable_discontinuous_mode_regular(ADC1, ADC_CR1_DISCNUM_1CHANNELS);
+        ADC_CCR &= ~(ADC_CCR_DMA_MASK | ADC_CCR_DDS);
+        ADC_CCR |= ADC_CCR_DMA_MODE_1;
+        adc_set_multi_mode(ADC_CCR_MULTI_INDEPENDENT);
+    }
+    else if(adc_mode == DUAL_ADC)
+    {
+        u8 channels1[] = {ADC_CHANNEL1};
+        u8 channels2[] = {ADC_CHANNEL2};
+        adc_set_regular_sequence(ADC1, 1, channels1);
+        adc_set_regular_sequence(ADC2, 1, channels2);
+
+        adc_disable_external_trigger_regular(ADC2);
+        ADC_CCR &= ~(ADC_CCR_DMA_MASK | ADC_CCR_DDS);
+        ADC_CCR |= ADC_CCR_DMA_MODE_1 | ADC_CCR_DDS;
+        adc_set_multi_mode(ADC_CCR_MULTI_DUAL_REG_SIMUL_AND_INJECTED_SIMUL);
+    }
 
 	adc_set_resolution(ADC1, ADC_CR1_RES_12BIT);
-
-	adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
-
-    adc_enable_dma(ADC1);
-    adc_set_dma_continue(ADC1);
-    ADC_CCR |= ADC_CCR_DMA_MODE_1;
-
-	adc_set_right_aligned(ADC1);
-	adc_set_multi_mode(ADC_CCR_MULTI_INDEPENDENT);
-	adc_power_on(ADC1);
-}
-
-void adc_setup_dual()
-{
-    gpio_mode_setup(GPIOA, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO1 | GPIO2);
-    rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_ADC1EN);
-    rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_ADC2EN);
-    adc_set_clk_prescale(0);
-    adc_set_single_conversion_mode(ADC1);
-    adc_set_single_conversion_mode(ADC2);
-    adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR1_SMP_1DOT5CYC);
-    adc_set_sample_time(ADC2, ADC_CHANNEL2, ADC_SMPR1_SMP_1DOT5CYC);
-
-    u8 channels1[] = {ADC_CHANNEL1};
-    u8 channels2[] = {ADC_CHANNEL2};
-    adc_set_regular_sequence(ADC1, 1, channels1);
-    adc_set_regular_sequence(ADC2, 1, channels2);
-
-    adc_set_resolution(ADC1, ADC_CR1_RES_12BIT);
     adc_set_resolution(ADC2, ADC_CR1_RES_12BIT);
 
-    adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
-    adc_disable_external_trigger_regular(ADC2);
-    // adc_enable_external_trigger_regular(ADC2,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
+	adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
 
     adc_enable_dma(ADC1);
     adc_enable_dma(ADC2);
     adc_set_dma_continue(ADC1);
     adc_set_dma_continue(ADC2);
 
-    ADC_CCR |= ADC_CCR_DMA_MODE_1 | ADC_CCR_DDS;
-
     adc_set_right_aligned(ADC1);
-    adc_set_right_aligned(ADC2);
-    adc_set_multi_mode(ADC_CCR_MULTI_DUAL_REG_SIMUL_AND_INJECTED_SIMUL);
+	adc_set_right_aligned(ADC2);
     adc_power_on(ADC1);
-    adc_power_on(ADC2);
-
+    if(adc_mode == DUAL_ADC)
+	   adc_power_on(ADC2);
 }
 
 void exti_timer_setup()
 {
     // Timer is used for deboucing
-    // If output on trigger is the same 30ms later, accept as input
+    // If output on trigger is the same 3ms later, accept as input
     rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_TIM3EN);
     timer_reset(TIM3);
     timer_set_mode(TIM3, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
@@ -481,9 +490,9 @@ int main(void)
 	gpio_set_af(GPIOA, GPIO_AF10, GPIO9 | GPIO11 | GPIO12);
 
     adc_mode = DUAL_ADC;
+    adc_mode = REGULAR_ADC;
     dma_setup();
-    adc_setup_dual();
-	// adc_setup();
+	adc_setup();
 	timer_setup();
     exti_timer_setup();
 
@@ -544,11 +553,44 @@ void dma2_stream0_isr()
         head_ptr = nhead;
 
         data_bufs[head_ptr].data[0] = tperiod>>3;
-        for(i = 0; i < DATA_BUF_SHORTS/2; ++i)
+        if(adc_mode == REGULAR_ADC)
         {
-            data_bufs[head_ptr].data[i*3+1] = dbuf0[i*2]&0xFF;
-            data_bufs[head_ptr].data[i*3+2] = dbuf0[i*2+1]&0xFF;
-            data_bufs[head_ptr].data[i*3+3] = (dbuf0[i*2]>>8) | ((dbuf0[i*2+1]>>4)&0xF0);
+            unsigned voltage, b0, b1;
+            short c, dptr;
+
+            for(i = 0, c = 0, dptr = 1; i < REGULAR_ADC_SHORTS; ++i, ++c)
+            {
+                if(c == 15)
+                    c = 0;
+                if(c == 0)
+                    voltage = dbuf0[i];
+                else if((c&1) == 1)
+                {
+                    b0 = (dbuf0[i] * voltage) >> 12;
+                    data_bufs[head_ptr].data[dptr] = b0&0xFF;
+                    dptr++;
+                }
+                else
+                {
+                    b1 = (dbuf0[i] * voltage) >> 12;
+                    data_bufs[head_ptr].data[dptr] = b1&0xFF;
+                    dptr++;
+
+                    data_bufs[head_ptr].data[dptr] = (b0>>8) | ((b1>>4)&0xF0);
+                    dptr++;
+                }
+            }
+        }
+        else if(adc_mode == DUAL_ADC)
+        {
+            for(i = 0; i < DUAL_ADC_SHORTS/4; ++i)
+            {
+                unsigned b0 = (dbuf0[i*4+0] * dbuf0[i*4+1]) >> 12;
+                unsigned b1 = (dbuf0[i*4+2] * dbuf0[i*4+3]) >> 12;
+                data_bufs[head_ptr].data[i*3+1] = b0&0xFF;
+                data_bufs[head_ptr].data[i*3+2] = b1&0xFF;
+                data_bufs[head_ptr].data[i*3+3] = (b0>>8) | ((b1>>4)&0xF0);
+            }
         }
 
         if(running)
