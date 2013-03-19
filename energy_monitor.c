@@ -107,8 +107,9 @@ void exti_setup()
     nvic_disable_irq(NVIC_EXTI4_IRQ);
     nvic_disable_irq(NVIC_EXTI9_5_IRQ);
     nvic_disable_irq(NVIC_EXTI15_10_IRQ);
-    timer_disable_counter(TIM3);
-    exti_reset_request(EXTI0);
+    // timer_disable_counter(TIM3);
+    exti_reset_request(EXTI0 | EXTI1 | EXTI2 | EXTI3 | EXTI4 | EXTI5 | EXTI6  | EXTI7
+            | EXTI8 | EXTI9 | EXTI10 | EXTI11 | EXTI12 | EXTI13 | EXTI14  | EXTI15);
 
     if(trigger_port == -1)
         return;
@@ -116,6 +117,7 @@ void exti_setup()
     exti_select_source(trigger_pin, trigger_port);
     exti_set_trigger(trigger_pin, EXTI_TRIGGER_BOTH);
     exti_enable_request(trigger_pin);
+    gpio_mode_setup(trigger_port, GPIO_MODE_INPUT, GPIO_PUPD_NONE, trigger_pin);
 
     switch(trigger_pin)
     {
@@ -383,8 +385,16 @@ void exti_timer_setup()
     timer_set_master_mode(TIM3, TIM_CR2_MMS_UPDATE);
     timer_enable_irq(TIM3, TIM_DIER_UIE);
 
-    nvic_set_priority(NVIC_TIM3_IRQ, 0);
+    nvic_set_priority(NVIC_TIM3_IRQ, 10);
     nvic_enable_irq(NVIC_TIM3_IRQ);
+
+    nvic_set_priority(NVIC_EXTI0_IRQ, 9);
+    nvic_set_priority(NVIC_EXTI1_IRQ, 9);
+    nvic_set_priority(NVIC_EXTI2_IRQ, 9);
+    nvic_set_priority(NVIC_EXTI3_IRQ, 9);
+    nvic_set_priority(NVIC_EXTI4_IRQ, 9);
+    nvic_set_priority(NVIC_EXTI9_5_IRQ, 9);
+    nvic_set_priority(NVIC_EXTI15_10_IRQ, 9);
 }
 
 usbd_device *usbd_dev;
@@ -400,11 +410,13 @@ int main(void)
 	rcc_clock_setup_hse_3v3(&hse_8mhz_3v3[CLOCK_3V3_168MHZ]);
 
 	rcc_peripheral_enable_clock(&RCC_AHB1ENR, RCC_AHB1ENR_DMA2EN);
-	rcc_peripheral_enable_clock(&RCC_AHB1ENR, RCC_AHB1ENR_IOPAEN);
+    rcc_peripheral_enable_clock(&RCC_AHB1ENR, RCC_AHB1ENR_IOPAEN);
+    rcc_peripheral_enable_clock(&RCC_AHB1ENR, RCC_AHB1ENR_IOPBEN);
+	rcc_peripheral_enable_clock(&RCC_AHB1ENR, RCC_AHB1ENR_IOPCEN);
 	rcc_peripheral_enable_clock(&RCC_AHB1ENR, RCC_AHB1ENR_IOPDEN);
 	rcc_peripheral_enable_clock(&RCC_AHB2ENR, RCC_AHB2ENR_OTGFSEN);
 
-	gpio_mode_setup(GPIOA, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO0);
+	// gpio_mode_setup(GPIOA, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO0);
 	gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9 | GPIO11 | GPIO12);
 	gpio_mode_setup(GPIOD, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO15 | GPIO14 | GPIO13 | GPIO12);
 	gpio_set_af(GPIOA, GPIO_AF10, GPIO9 | GPIO11 | GPIO12);
@@ -500,13 +512,24 @@ void dma2_stream0_isr()
 
 int status = -1;
 
-void exti0_isr()
+void exti0_isr () __attribute__ ((weak, alias ("exti_isr")));
+void exti1_isr () __attribute__ ((weak, alias ("exti_isr")));
+void exti2_isr () __attribute__ ((weak, alias ("exti_isr")));
+void exti3_isr () __attribute__ ((weak, alias ("exti_isr")));
+void exti4_isr () __attribute__ ((weak, alias ("exti_isr")));
+void exti9_5_isr () __attribute__ ((weak, alias ("exti_isr")));
+void exti15_10_isr () __attribute__ ((weak, alias ("exti_isr")));
+
+void exti_isr()
 {
-    exti_reset_request(EXTI0);
+    exti_reset_request(trigger_pin);
+
+    gpio_toggle(GPIOD, GPIO13);
+
 
     if(status == -1)
     {
-        status = gpio_get(GPIOA, GPIO0);
+        status = gpio_get(trigger_port, trigger_pin);
         timer_enable_counter(TIM3);
         timer_set_counter(TIM3, 0);
     }
@@ -515,7 +538,7 @@ void exti0_isr()
 void tim3_isr()
 {
     TIM_SR(TIM3) &= ~TIM_SR_UIF;
-    if(gpio_get(GPIOA, GPIO0))
+    if(gpio_get(trigger_port, trigger_pin))
     {
         gpio_toggle(GPIOD, GPIO12);
         timer_disable_counter(TIM3);
