@@ -11,6 +11,10 @@
 #include <libopencm3/stm32/f4/flash.h>
 #include <libopencm3/stm32/exti.h>
 
+#define REGULAR_ADC     0
+#define DUAL_ADC        1
+#define OVERSAMPLED_ADC 2
+
 // USB Code
 
 static const struct usb_device_descriptor dev = {
@@ -224,6 +228,14 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
 
         trigger_pin = 1 << (*buf)[1];
         exti_setup();
+        break;
+    }
+    case 5:     // Set mode
+    {
+        if(*len != 1)
+            return 0;
+
+        // (*buf)[0]
         break;
     }
     default:

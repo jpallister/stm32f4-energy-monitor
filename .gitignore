@@ -1,3 +1,6 @@
 energy_monitor
+host_receiver
 recv
 *.sublime-workspace
+*.s
+*.o

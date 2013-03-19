@@ -56,7 +56,10 @@ void processCommand(string input)
         int i = 0;
 
         if(devlist.empty())
+        {
             cout << "    No devices found!" << endl;
+            return;
+        }
 
         if(devlist.size() > 1)
         {
@@ -111,6 +114,11 @@ void processCommand(string input)
     }
     else if(args[0] == "setserial")
     {
+        if(!connected)
+        {
+            cout << "    Need to be connected" << endl;
+            return;
+        }
         if(args.size() < 2)
         {
             cout << "Command expects parameters" << endl;
@@ -126,6 +134,11 @@ void processCommand(string input)
     }
     else if(args[0] == "trigger")
     {
+        if(!connected)
+        {
+            cout << "    Need to be connected" << endl;
+            return;
+        }
         if(args.size() < 2)
         {
             cout << "Command expects parameters" << endl;
@@ -160,18 +173,38 @@ void processCommand(string input)
     }
     else if(args[0] == "leds")
     {
+        if(!connected)
+        {
+            cout << "    Need to be connected" << endl;
+            return;
+        }
         liObj->sendCommand(LibusbInterface::LED);
     }
     else if(args[0] == "start")
     {
+        if(!connected)
+        {
+            cout << "    Need to be connected" << endl;
+            return;
+        }
         liObj->sendCommand(LibusbInterface::START);
     }
     else if(args[0] == "stop")
     {
+        if(!connected)
+        {
+            cout << "    Need to be connected" << endl;
+            return;
+        }
         liObj->sendCommand(LibusbInterface::STOP);
     }
     else if(args[0] == "power")
     {
+        if(!connected)
+        {
+            cout << "    Need to be connected" << endl;
+            return;
+        }
         if(args.size() < 2)
         {
             dpObj->setAccumulation(true);
@@ -181,6 +214,31 @@ void processCommand(string input)
             dpObj->setAccumulation(true);
         else
             dpObj->setAccumulation(false);
+    }
+    else if(args[0] == "mode")
+    {
+        if(!connected)
+        {
+            cout << "    Need to be connected" << endl;
+            return;
+        }
+        if(args.size() < 2)
+        {
+            cout << "Command expects parameters" << endl;
+            return;
+        }
+        if(args[1] == "normal")
+        {
+            liObj->setMode(LibusbInterface::NORMAL_ADC);
+        }
+        else if(args[1] == "dual")
+        {
+            liObj->setMode(LibusbInterface::DUAL_ADC);
+        }
+        else if(args[1] == "oversampled")
+        {
+            liObj->setMode(LibusbInterface::OVERSAMPLED_ADC);
+        }
     }
     else if(args[0] == "help")
     {
@@ -194,13 +252,13 @@ void processCommand(string input)
         cout << "    start                       Start energy measurement" << endl;
         cout << "    stop                        Stop energy measurement" << endl;
         cout << "    trigger" << endl;
-        cout << "             PIN                 Trigger measurement on PIN (e.g PA0)" << endl;
-        cout << "             none                Remove trigger" << endl;
+        cout << "             PIN                Trigger measurement on PIN (e.g PA0)" << endl;
+        cout << "             none               Remove trigger" << endl;
         cout << "    mode " << endl;
-        cout << "             normal" << endl;
-        cout << "             dual" << endl;
-        cout << "             oversampled" << endl;
-        cout << "    exit                       Exit the application" << endl;
+        cout << "         normal                 Normal ADC mode" << endl;
+        cout << "         dual                   Dual ADC, one voltage, one current, multiplied on board" << endl;
+        cout << "         oversampled            Run ADC as fast as possible, average samples" << endl;
+        cout << "    exit                        Exit the application" << endl;
         return;
     }
     else if(args[0] == "exit" || args[0] == "quit")

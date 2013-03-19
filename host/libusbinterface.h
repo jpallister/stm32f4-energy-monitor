@@ -24,12 +24,20 @@ public:
         START = 1,
         STOP = 2,
         SETSERIAL = 3,
-        SETTRIGGER = 4
+        SETTRIGGER = 4,
+        SETMODE = 5
+    };
+
+    enum Mode {
+        NORMAL_ADC = 0,
+        DUAL_ADC = 1,
+        OVERSAMPLED_ADC = 2
     };
 
     void sendCommand(CommandType);
     void setSerial(std::string);
     void setTrigger(char, int);
+    void setMode(Mode);
 
 private:
     boost::mutex *mQueue;
