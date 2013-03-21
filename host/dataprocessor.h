@@ -1,8 +1,19 @@
 #ifndef __DATAPROCESSOR_H__
 #define __DATAPROCESSOR_H__
 #include <queue>
+#include <vector>
 #include <boost/thread.hpp>
 #include <boost/shared_array.hpp>
+#include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/statistics/stats.hpp>
+#include <boost/accumulators/statistics/mean.hpp>
+#include <boost/accumulators/statistics/variance.hpp>
+#include <boost/accumulators/statistics/min.hpp>
+#include <boost/accumulators/statistics/max.hpp>
+
+#define TIMER_SECOND_TICKS      84000000
+
+namespace _ba =  boost::accumulators;
 
 class DataProcessor
 {
@@ -19,6 +30,7 @@ private:
     boost::shared_array<unsigned char> data;
 
     int status;
+    bool isEmpty;
 
     void getData();
     void processData();
@@ -27,9 +39,12 @@ private:
     unsigned long cur_time;
 
     bool doAccumulation;
-    unsigned long long total, sqTotal;
-    unsigned min_v, max_v;
-    unsigned count;
+
+    void addDataItem(short, unsigned long);
+
+    _ba::accumulator_set<double, _ba::features<_ba::tag::variance, _ba::tag::min, _ba::tag::max> > last_data, current_data;
+    unsigned long last_tick;
+    bool switched;
 };
 
 #endif

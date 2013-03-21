@@ -6,7 +6,9 @@
 #include "helper.h"
 #include <math.h>
 
+using namespace std;
 using namespace boost;
+using namespace boost::accumulators;
 
 DataProcessor::DataProcessor(boost::mutex *m, std::queue<boost::shared_array<unsigned char> > *d)
 {
@@ -15,12 +17,10 @@ DataProcessor::DataProcessor(boost::mutex *m, std::queue<boost::shared_array<uns
     status = 0;
     output = fopen("output_results", "w");
     cur_time = 0;
-    total = 0;
-    sqTotal = 0;
-    min_v = 4096;
-    max_v = 0;
-    count = 0;
     doAccumulation = false;
+    last_tick = 0;
+    switched = false;
+    isEmpty = true;
 }
 
 DataProcessor::~DataProcessor()
@@ -37,30 +37,25 @@ void DataProcessor::operator()()
     int t1, t2;
 
     t1 = time(0);
-    while(status == 0)
+    while(status == 0 || !isEmpty)
     {
         getData();
-        if(status != 0)
+        if(status != 0 && isEmpty)
             continue;
         processData();
         // printf("gda\n");
 
         t2 = time(0);
-        if(t2 - t1 >= 2 && doAccumulation)
+        if(switched && doAccumulation)
         {
             mt_start_output();
-            printf("Avg: %4.1lf    Std:%3.1lf    Max: %4d    Min: %4d\n",(double)total/count,
-                    sqrt(((double)sqTotal/count)
-                        -((double)total*total/((double)count*count))),
-                    min_v, max_v);
+            printf("Avg: %4.1lf    Std:%3.1lf    Min: %4d    Max: %4d\n",mean(last_data),
+                    sqrt(variance(last_data)),
+                    (int)extract::min(last_data), (int)extract::max(last_data));
             mt_end_output();
 
             t1 = t2;
-            total = 0;
-            sqTotal = 0;
-            min_v = 4096;
-            max_v = 0;
-            count = 0;
+            switched = false;
         }
     }
 }
@@ -73,14 +68,30 @@ void DataProcessor::getData()
 
             if(!dQueue->empty())
             {
+                isEmpty = false;
                 data = dQueue->front();
                 dQueue->pop();
                 return;
             }
+            isEmpty = true;
         }
         sleep(1);
     } while(status == 0);
 
+}
+
+void DataProcessor::addDataItem(short val, unsigned long tstamp)
+{
+    if(tstamp > last_tick + TIMER_SECOND_TICKS)
+    {
+        last_data = current_data;
+        // clear(current_data);
+        current_data = decltype(current_data)();
+        switched = true;
+        last_tick = tstamp;
+    }
+
+    current_data(val);
 }
 
 /*
@@ -121,22 +132,14 @@ void DataProcessor::processData()
         {
             b1 |= (data[i]&0x0F) << 8;
             b2 |= (data[i]&0xF0) << 4;
+
             fprintf(output, "%d %lu\n", b1, cur_time);
-            cur_time += rate;
-            fprintf(output, "%d %lu\n", b2, cur_time);
+            addDataItem(b1, cur_time);
             cur_time += rate;
 
-            total += b1 + b2;
-            sqTotal += (unsigned long)b1*b1 + (unsigned long)b2*b2;
-            if(b1 < min_v)
-                min_v = b1;
-            if(b2 < min_v)
-                min_v = b2;
-            if(b1 > max_v)
-                max_v = b1;
-            if(b2 > max_v)
-                max_v = b2;
-            count += 2;
+            fprintf(output, "%d %lu\n", b2, cur_time);
+            addDataItem(b2, cur_time);
+            cur_time += rate;
         }
     }
 }
