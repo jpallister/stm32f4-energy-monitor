@@ -49,9 +49,9 @@ void DataProcessor::operator()()
         if(switched && doAccumulation)
         {
             mt_start_output();
-            printf("Avg: %4.1lf    Std:%3.1lf    Min: %4d    Max: %4d\n",mean(last_data),
-                    sqrt(variance(last_data)),
-                    (int)extract::min(last_data), (int)extract::max(last_data));
+            printf("Avg: %4.1lf    Std:%3.1lf    Min: %4d    Max: %4d    kS/s:%3.1lf\n",mean(last_data),
+                    sqrt(variance(last_data)), (int)extract::min(last_data), (int)extract::max(last_data),
+                    extract::count(last_data)/1000.);
             mt_end_output();
 
             t1 = t2;
@@ -88,7 +88,7 @@ void DataProcessor::addDataItem(short val, unsigned long tstamp)
         // clear(current_data);
         current_data = decltype(current_data)();
         switched = true;
-        last_tick = tstamp;
+        last_tick += TIMER_SECOND_TICKS;
     }
 
     current_data(val);
