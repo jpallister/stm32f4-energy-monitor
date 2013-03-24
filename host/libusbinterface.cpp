@@ -234,22 +234,6 @@ bool LibusbInterface::open_device()
     return false;
 }
 
-void LibusbInterface::send_start()
-{
-    unsigned char buf[] = "S";
-    int len;
-
-    libusb_bulk_transfer(devh, 0x1, buf, 1, &len, 0);
-}
-
-void LibusbInterface::send_end()
-{
-    unsigned char buf[] = "F";
-    int len;
-
-    libusb_bulk_transfer(devh, 0x1, buf, 1, &len, 0);
-}
-
 void LibusbInterface::close_device()
 {
     if(devh)
@@ -293,7 +277,7 @@ void LIBUSB_CALL LibusbInterface::transfer_callback(struct libusb_transfer *tran
         return;
     }
 
-    // printf("cb\n");
+    // printf("cb %d\n", _this->data_buf[0]);
     _this->total_len += DATA_LEN;
 
     shared_array<unsigned char> data(new unsigned char[DATA_LEN]);
