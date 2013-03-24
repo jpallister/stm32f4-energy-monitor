@@ -333,7 +333,7 @@ static void usbdev_set_config(usbd_device *usbd_dev, u16 wValue)
 #define REGULAR_ADC_SHORTS  45
 #define DUAL_ADC_SHORTS     (42*2)
 
-#define OVERSAMPLED_BITS    0
+#define OVERSAMPLED_BITS    1
 #define OVERSAMPLED_RATIO   (1<<OVERSAMPLED_BITS)
 #define OVERSAMPLED_ADC_SHORTS     (42*2*OVERSAMPLED_RATIO)
 
@@ -445,8 +445,8 @@ void adc_setup()
         ADC_CCR |= ADC_CCR_DMA_MODE_1 | ADC_CCR_DDS;
         adc_set_multi_mode(ADC_CCR_MULTI_DUAL_REG_SIMUL_AND_INJECTED_SIMUL);
 
-        adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR1_SMP_28DOT5CYC);
-        adc_set_sample_time(ADC2, ADC_CHANNEL2, ADC_SMPR1_SMP_28DOT5CYC);
+        adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR1_SMP_7DOT5CYC);
+        adc_set_sample_time(ADC2, ADC_CHANNEL2, ADC_SMPR1_SMP_7DOT5CYC);
         adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
     }
     else if(adc_mode == INTERLEAVED_ADC)
@@ -716,6 +716,8 @@ void dma2_stream0_isr()
                 err = (int)((float)err * ((float)sent_counter/(float)(NUM_BUFFERS)));
 
             tperiod -= ((err>>4) + ((err - lastErr)<<3));
+            if(tperiod < 8)
+                tperiod = 8;
             lastErr = err;
 
             timer_set_period(TIM2, tperiod >> 3);
