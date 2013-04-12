@@ -18,37 +18,37 @@
 // USB Code
 
 static const struct usb_device_descriptor dev = {
-	.bLength = USB_DT_DEVICE_SIZE,
-	.bDescriptorType = USB_DT_DEVICE,
-	.bcdUSB = 0x0200,
-	.bDeviceClass = 0,
-	.bDeviceSubClass = 0,
-	.bDeviceProtocol = 0,
-	.bMaxPacketSize0 = 64,
-	.idVendor = 0x1337,
-	.idProduct = 0x1337,
-	.bcdDevice = 0x0200,
-	.iManufacturer = 1,
-	.iProduct = 2,
-	.iSerialNumber = 3,
-	.bNumConfigurations = 1,
+    .bLength = USB_DT_DEVICE_SIZE,
+    .bDescriptorType = USB_DT_DEVICE,
+    .bcdUSB = 0x0200,
+    .bDeviceClass = 0,
+    .bDeviceSubClass = 0,
+    .bDeviceProtocol = 0,
+    .bMaxPacketSize0 = 64,
+    .idVendor = 0x1337,
+    .idProduct = 0x1337,
+    .bcdDevice = 0x0200,
+    .iManufacturer = 1,
+    .iProduct = 2,
+    .iSerialNumber = 3,
+    .bNumConfigurations = 1,
 };
 
 
 static const struct usb_endpoint_descriptor data_endp[] = {{
-	.bLength = USB_DT_ENDPOINT_SIZE,
-	.bDescriptorType = USB_DT_ENDPOINT,
-	.bEndpointAddress = 0x81,
-	.bmAttributes = USB_ENDPOINT_ATTR_BULK,
-	.wMaxPacketSize = 64,
-	.bInterval = 1,
+    .bLength = USB_DT_ENDPOINT_SIZE,
+    .bDescriptorType = USB_DT_ENDPOINT,
+    .bEndpointAddress = 0x81,
+    .bmAttributes = USB_ENDPOINT_ATTR_BULK,
+    .wMaxPacketSize = 64,
+    .bInterval = 1,
 }, {
-	.bLength = USB_DT_ENDPOINT_SIZE,
-	.bDescriptorType = USB_DT_ENDPOINT,
-	.bEndpointAddress = 0x01,
-	.bmAttributes = USB_ENDPOINT_ATTR_BULK,
-	.wMaxPacketSize = 64,
-	.bInterval = 1,
+    .bLength = USB_DT_ENDPOINT_SIZE,
+    .bDescriptorType = USB_DT_ENDPOINT,
+    .bEndpointAddress = 0x01,
+    .bmAttributes = USB_ENDPOINT_ATTR_BULK,
+    .wMaxPacketSize = 64,
+    .bInterval = 1,
 }, {
     .bLength = USB_DT_ENDPOINT_SIZE,
     .bDescriptorType = USB_DT_ENDPOINT,
@@ -59,42 +59,42 @@ static const struct usb_endpoint_descriptor data_endp[] = {{
 }};
 
 static const struct usb_interface_descriptor data_iface[] = {{
-	.bLength = USB_DT_INTERFACE_SIZE,
-	.bDescriptorType = USB_DT_INTERFACE,
-	.bInterfaceNumber = 0,
-	.bAlternateSetting = 0,
-	.bNumEndpoints = 3,
-	.bInterfaceClass = 0xFF,
-	.bInterfaceSubClass = 0,
+    .bLength = USB_DT_INTERFACE_SIZE,
+    .bDescriptorType = USB_DT_INTERFACE,
+    .bInterfaceNumber = 0,
+    .bAlternateSetting = 0,
+    .bNumEndpoints = 3,
+    .bInterfaceClass = 0xFF,
+    .bInterfaceSubClass = 0,
     .bInterfaceProtocol = 0,
-	.iInterface = 2,
+    .iInterface = 2,
 
-	.endpoint = data_endp,
+    .endpoint = data_endp,
 }};
 
 static const struct usb_interface ifaces[] = {{
-	.num_altsetting = 1,
-	.altsetting = data_iface,
+    .num_altsetting = 1,
+    .altsetting = data_iface,
 }};
 
 static const struct usb_config_descriptor config = {
-	.bLength = USB_DT_CONFIGURATION_SIZE,
-	.bDescriptorType = USB_DT_CONFIGURATION,
-	.wTotalLength = 0,
-	.bNumInterfaces = 1,
-	.bConfigurationValue = 1,
-	.iConfiguration = 0,
-	.bmAttributes = 0x80,
-	.bMaxPower = 0x32,
+    .bLength = USB_DT_CONFIGURATION_SIZE,
+    .bDescriptorType = USB_DT_CONFIGURATION,
+    .wTotalLength = 0,
+    .bNumInterfaces = 1,
+    .bConfigurationValue = 1,
+    .iConfiguration = 0,
+    .bmAttributes = 0x80,
+    .bMaxPower = 0x32,
 
-	.interface = ifaces,
+    .interface = ifaces,
 };
 
 static const char serial_str[] __attribute__ ((section (".flash"))) = "MSEM0000";
 
 static const char *usb_strings[] = {
-	"James Pallister",
-	"Medium speed energy monitor",
+    "James Pallister",
+    "Medium speed energy monitor",
     serial_str,
 };
 
@@ -170,19 +170,19 @@ void stop_measurement()
 }
 
 static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *req, u8 **buf,
-		u16 *len, void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
+        u16 *len, void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
 {
     int i;
 
-	(void)complete;
-	(void)buf;
-	(void)usbd_dev;
+    (void)complete;
+    (void)buf;
+    (void)usbd_dev;
 
     gpio_toggle(GPIOD, GPIO14);
 
 
-	switch (req->bRequest) {
-	case 0:    // toggle LEDS
+    switch (req->bRequest) {
+    case 0:    // toggle LEDS
         gpio_toggle(GPIOD, GPIO13);
         *len = 0;
         break;
@@ -254,17 +254,17 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
     }
     default:
         return 0;
-	}
-	return 1;
+    }
+    return 1;
 }
 
 static void usbdev_data_rx_cb(usbd_device *usbd_dev, u8 ep)
 {
-	(void)ep;
+    (void)ep;
 
-	char buf[64];
-	int len = usbd_ep_read_packet(usbd_dev, 0x01, buf, 64);
-	int i;
+    char buf[64];
+    int len = usbd_ep_read_packet(usbd_dev, 0x01, buf, 64);
+    int i;
 
     for(i = 0; i < len; ++i)
     {
@@ -273,18 +273,18 @@ static void usbdev_data_rx_cb(usbd_device *usbd_dev, u8 ep)
             running = 1;
             head_ptr = 0;
             tail_ptr = 0;
-			timer_enable_counter(TIM2);
-        	adc_power_on(ADC1);
+            timer_enable_counter(TIM2);
+            adc_power_on(ADC1);
         }
         if(buf[i] == 'F')
         {
             running = 0;
-			timer_disable_counter(TIM2);
-        	adc_off(ADC1);
+            timer_disable_counter(TIM2);
+            adc_off(ADC1);
         }
     }
 
-	gpio_toggle(GPIOD, GPIO15);
+    gpio_toggle(GPIOD, GPIO15);
 }
 
 
@@ -295,17 +295,17 @@ static void usb_reset_cb()
 
 static void usbdev_set_config(usbd_device *usbd_dev, u16 wValue)
 {
-	(void)wValue;
+    (void)wValue;
 
-	usbd_ep_setup(usbd_dev, 0x01, USB_ENDPOINT_ATTR_BULK, 64, usbdev_data_rx_cb);
+    usbd_ep_setup(usbd_dev, 0x01, USB_ENDPOINT_ATTR_BULK, 64, usbdev_data_rx_cb);
     usbd_ep_setup(usbd_dev, 0x81, USB_ENDPOINT_ATTR_BULK, 64, NULL);
-	usbd_ep_setup(usbd_dev, 0x82, USB_ENDPOINT_ATTR_INTERRUPT, 64, NULL);
+    usbd_ep_setup(usbd_dev, 0x82, USB_ENDPOINT_ATTR_INTERRUPT, 64, NULL);
 
-	usbd_register_control_callback(
-				usbd_dev,
-				USB_REQ_TYPE_VENDOR | USB_REQ_TYPE_INTERFACE,
-				USB_REQ_TYPE_TYPE | USB_REQ_TYPE_RECIPIENT,
-				usbdev_control_request);
+    usbd_register_control_callback(
+                usbd_dev,
+                USB_REQ_TYPE_VENDOR | USB_REQ_TYPE_INTERFACE,
+                USB_REQ_TYPE_TYPE | USB_REQ_TYPE_RECIPIENT,
+                usbdev_control_request);
 
     usbd_register_reset_callback(usbd_dev, usb_reset_cb);
 }
@@ -372,38 +372,38 @@ void dma_setup()
 
 void timer_setup()
 {
-	rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_TIM2EN);
+    rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_TIM2EN);
 
     timer_disable_counter(TIM2);
-	timer_reset(TIM2);
-	timer_set_mode(TIM2, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
-	timer_set_period(TIM2, tperiod>>2);
-	timer_set_prescaler(TIM2, 0);
-	timer_set_clock_division(TIM2, TIM_CR1_CKD_CK_INT);
-	timer_set_master_mode(TIM2, TIM_CR2_MMS_UPDATE);
+    timer_reset(TIM2);
+    timer_set_mode(TIM2, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
+    timer_set_period(TIM2, tperiod>>2);
+    timer_set_prescaler(TIM2, 0);
+    timer_set_clock_division(TIM2, TIM_CR1_CKD_CK_INT);
+    timer_set_master_mode(TIM2, TIM_CR2_MMS_UPDATE);
     timer_enable_preload(TIM2);
 }
 
 void adc_setup()
 {
-	gpio_mode_setup(GPIOA, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO1 | GPIO2);
+    gpio_mode_setup(GPIOA, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO1 | GPIO2);
     rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_ADC1EN);
     rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_ADC2EN);
     adc_off(ADC1);
     adc_off(ADC2);
-	adc_set_clk_prescale(0);
+    adc_set_clk_prescale(0);
     adc_set_single_conversion_mode(ADC1);
-	adc_set_single_conversion_mode(ADC2);
+    adc_set_single_conversion_mode(ADC2);
     adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR1_SMP_1DOT5CYC);
     adc_set_sample_time(ADC1, ADC_CHANNEL2, ADC_SMPR1_SMP_1DOT5CYC);
-	adc_set_sample_time(ADC2, ADC_CHANNEL2, ADC_SMPR1_SMP_1DOT5CYC);
+    adc_set_sample_time(ADC2, ADC_CHANNEL2, ADC_SMPR1_SMP_1DOT5CYC);
 
     if(adc_mode == REGULAR_ADC)
     {
-	    u8 channels[] = {ADC_CHANNEL2, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1,
+        u8 channels[] = {ADC_CHANNEL2, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1,
             ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1,
             ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1};
-	    adc_set_regular_sequence(ADC1, 15, channels);
+        adc_set_regular_sequence(ADC1, 15, channels);
         adc_enable_scan_mode(ADC1);
         adc_enable_discontinuous_mode_regular(ADC1, ADC_CR1_DISCNUM_1CHANNELS);
         ADC_CCR &= ~(ADC_CCR_DMA_MASK | ADC_CCR_DDS);
@@ -423,10 +423,10 @@ void adc_setup()
         adc_set_multi_mode(ADC_CCR_MULTI_DUAL_REG_SIMUL_AND_INJECTED_SIMUL);
     }
 
-	adc_set_resolution(ADC1, ADC_CR1_RES_12BIT);
+    adc_set_resolution(ADC1, ADC_CR1_RES_12BIT);
     adc_set_resolution(ADC2, ADC_CR1_RES_12BIT);
 
-	adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
+    adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
 
     adc_enable_dma(ADC1);
     adc_enable_dma(ADC2);
@@ -434,10 +434,10 @@ void adc_setup()
     adc_set_dma_continue(ADC2);
 
     adc_set_right_aligned(ADC1);
-	adc_set_right_aligned(ADC2);
+    adc_set_right_aligned(ADC2);
     adc_power_on(ADC1);
     if(adc_mode == DUAL_ADC)
-	   adc_power_on(ADC2);
+       adc_power_on(ADC2);
 }
 
 void exti_timer_setup()
@@ -472,38 +472,38 @@ char interrupt_buf[4]= {0};
 
 int main(void)
 {
-	int c_started=0, n, cpy;
-	short s;
+    int c_started=0, n, cpy;
+    short s;
 
-	rcc_clock_setup_hse_3v3(&hse_8mhz_3v3[CLOCK_3V3_168MHZ]);
+    rcc_clock_setup_hse_3v3(&hse_8mhz_3v3[CLOCK_3V3_168MHZ]);
 
-	rcc_peripheral_enable_clock(&RCC_AHB1ENR, RCC_AHB1ENR_DMA2EN);
+    rcc_peripheral_enable_clock(&RCC_AHB1ENR, RCC_AHB1ENR_DMA2EN);
     rcc_peripheral_enable_clock(&RCC_AHB1ENR, RCC_AHB1ENR_IOPAEN);
     rcc_peripheral_enable_clock(&RCC_AHB1ENR, RCC_AHB1ENR_IOPBEN);
-	rcc_peripheral_enable_clock(&RCC_AHB1ENR, RCC_AHB1ENR_IOPCEN);
-	rcc_peripheral_enable_clock(&RCC_AHB1ENR, RCC_AHB1ENR_IOPDEN);
-	rcc_peripheral_enable_clock(&RCC_AHB2ENR, RCC_AHB2ENR_OTGFSEN);
+    rcc_peripheral_enable_clock(&RCC_AHB1ENR, RCC_AHB1ENR_IOPCEN);
+    rcc_peripheral_enable_clock(&RCC_AHB1ENR, RCC_AHB1ENR_IOPDEN);
+    rcc_peripheral_enable_clock(&RCC_AHB2ENR, RCC_AHB2ENR_OTGFSEN);
 
-	// gpio_mode_setup(GPIOA, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO0);
-	gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9 | GPIO11 | GPIO12);
-	gpio_mode_setup(GPIOD, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO15 | GPIO14 | GPIO13 | GPIO12);
-	gpio_set_af(GPIOA, GPIO_AF10, GPIO9 | GPIO11 | GPIO12);
+    // gpio_mode_setup(GPIOA, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO0);
+    gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9 | GPIO11 | GPIO12);
+    gpio_mode_setup(GPIOD, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO15 | GPIO14 | GPIO13 | GPIO12);
+    gpio_set_af(GPIOA, GPIO_AF10, GPIO9 | GPIO11 | GPIO12);
 
     adc_mode = DUAL_ADC;
     adc_mode = REGULAR_ADC;
     dma_setup();
-	adc_setup();
-	timer_setup();
+    adc_setup();
+    timer_setup();
     exti_timer_setup();
 
-	gpio_toggle(GPIOA, GPIO12);
+    gpio_toggle(GPIOA, GPIO12);
 
 
-	usbd_dev = usbd_init(&otgfs_usb_driver, &dev, &config, usb_strings, 3);
-	usbd_register_set_config_callback(usbd_dev, usbdev_set_config);
+    usbd_dev = usbd_init(&otgfs_usb_driver, &dev, &config, usb_strings, 3);
+    usbd_register_set_config_callback(usbd_dev, usbdev_set_config);
 
-	while (1)
-	{
+    while (1)
+    {
 
         usbd_poll(usbd_dev);
 
@@ -516,7 +516,7 @@ int main(void)
         if(head_ptr == tail_ptr)
             continue;
 
-		if(usbd_ep_write_packet(usbd_dev, 0x81, data_bufs[tail_ptr].data, DATA_BUF_BYTES) != 0)
+        if(usbd_ep_write_packet(usbd_dev, 0x81, data_bufs[tail_ptr].data, DATA_BUF_BYTES) != 0)
         {
             gpio_toggle(GPIOD, GPIO15);
 
@@ -527,7 +527,7 @@ int main(void)
                 sent_counter++;
         }
 
-	}
+    }
 }
 
 
@@ -664,5 +664,5 @@ void tim3_isr()
 
 void exit(int a)
 {
-	while(1);
+    while(1);
 }
