@@ -68,6 +68,9 @@ Trigger allow the energy measurement to be triggered by an external pin:
 
 This will set the measurement to start on the first rising edge of PA0, and stop on the next rising edge (this pin is also connected to the blue push-button on the board).
 
+The following line may have to be added to a udev rule (energy monitor appears as device id 0xF539:0xF539):
+
+    ATTRS{idVendor}=="0539", ATTRS{idProduct}=="0539", MODE="0666", GROUP="plugd    ev"
 
 How it works
 ------------
@@ -124,3 +127,4 @@ Bugs
 
 * Setting a trigger while currently measuring doesn't work correctly, and breaks something with the ADC, making it return incorrect results.
 * Device returns a string of 0 measurements before the first data.
+* Odd crashes sometime happen when the host disconnects unexpectedly.
