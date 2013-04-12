@@ -58,6 +58,8 @@ Commands
         save output to FILENAME
     setserial SERID
         set the serial ID
+    setresistor
+        set the value of the shunt resistor, in ohms
 
 commands seperated by ;
 

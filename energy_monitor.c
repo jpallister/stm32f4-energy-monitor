@@ -10,10 +10,12 @@
 #include <libopencm3/stm32/f4/dma.h>
 #include <libopencm3/stm32/f4/flash.h>
 #include <libopencm3/stm32/exti.h>
+#include <libopencm3/stm32/pwr.h>
 
 #define REGULAR_ADC     0
 #define DUAL_ADC        1
 #define OVERSAMPLED_ADC 2
+#define INTERLEAVED_ADC 3
 
 // USB Code
 
@@ -155,9 +157,17 @@ void start_measurement()
     head_ptr = 0;
     tail_ptr = 0;
     timer_enable_counter(TIM2);
+
     adc_power_on(ADC1);
     if(adc_mode == DUAL_ADC)
-        adc_power_on(ADC2);
+    {
+       adc_power_on(ADC2);
+    }
+    else if(adc_mode == OVERSAMPLED_ADC)
+    {
+       adc_power_on(ADC2);
+       adc_power_on(ADC3);
+    }
 }
 
 void stop_measurement()
@@ -165,8 +175,8 @@ void stop_measurement()
     running = 0;
     timer_disable_counter(TIM2);
     adc_off(ADC1);
-    if(adc_mode == DUAL_ADC)
-        adc_off(ADC2);
+    adc_off(ADC2);
+    adc_off(ADC3);
 }
 
 static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *req, u8 **buf,
@@ -323,13 +333,17 @@ static void usbdev_set_config(usbd_device *usbd_dev, u16 wValue)
 #define REGULAR_ADC_SHORTS  45
 #define DUAL_ADC_SHORTS     (42*2)
 
+#define OVERSAMPLED_BITS    1
+#define OVERSAMPLED_RATIO   (1<<OVERSAMPLED_BITS)
+#define OVERSAMPLED_ADC_SHORTS     (42*2*OVERSAMPLED_RATIO)
+
 typedef struct {
     unsigned char data[DATA_BUF_BYTES];
 } power_data;
 
 power_data data_bufs[NUM_BUFFERS] = {0};
 
-unsigned short dbuf0[128];
+unsigned short dbuf0[OVERSAMPLED_ADC_SHORTS];
 int sent_counter=0;
 
 
@@ -345,6 +359,11 @@ void dma_setup()
     {
         dma_set_peripheral_address(DMA2, DMA_STREAM0, (u32)&ADC1_DR);
         dma_set_number_of_data(DMA2, DMA_STREAM0, REGULAR_ADC_SHORTS);
+    }
+    else if(adc_mode == OVERSAMPLED_ADC)
+    {
+        dma_set_peripheral_address(DMA2, DMA_STREAM0, (u32)&ADC_CDR);
+        dma_set_number_of_data(DMA2, DMA_STREAM0, OVERSAMPLED_ADC_SHORTS);
     }
     else
     {
@@ -389,14 +408,14 @@ void adc_setup()
     gpio_mode_setup(GPIOA, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO1 | GPIO2);
     rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_ADC1EN);
     rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_ADC2EN);
+    rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_ADC3EN);
     adc_off(ADC1);
     adc_off(ADC2);
+
     adc_set_clk_prescale(0);
     adc_set_single_conversion_mode(ADC1);
     adc_set_single_conversion_mode(ADC2);
-    adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR1_SMP_1DOT5CYC);
-    adc_set_sample_time(ADC1, ADC_CHANNEL2, ADC_SMPR1_SMP_1DOT5CYC);
-    adc_set_sample_time(ADC2, ADC_CHANNEL2, ADC_SMPR1_SMP_1DOT5CYC);
+	adc_set_single_conversion_mode(ADC3);
 
     if(adc_mode == REGULAR_ADC)
     {
@@ -409,8 +428,12 @@ void adc_setup()
         ADC_CCR &= ~(ADC_CCR_DMA_MASK | ADC_CCR_DDS);
         ADC_CCR |= ADC_CCR_DMA_MODE_1;
         adc_set_multi_mode(ADC_CCR_MULTI_INDEPENDENT);
+
+        adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR1_SMP_1DOT5CYC);
+        adc_set_sample_time(ADC1, ADC_CHANNEL2, ADC_SMPR1_SMP_1DOT5CYC);
+        adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
     }
-    else if(adc_mode == DUAL_ADC)
+    else if(adc_mode == DUAL_ADC || adc_mode == OVERSAMPLED_ADC)
     {
         u8 channels1[] = {ADC_CHANNEL1};
         u8 channels2[] = {ADC_CHANNEL2};
@@ -421,23 +444,58 @@ void adc_setup()
         ADC_CCR &= ~(ADC_CCR_DMA_MASK | ADC_CCR_DDS);
         ADC_CCR |= ADC_CCR_DMA_MODE_1 | ADC_CCR_DDS;
         adc_set_multi_mode(ADC_CCR_MULTI_DUAL_REG_SIMUL_AND_INJECTED_SIMUL);
+
+        adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR1_SMP_7DOT5CYC);
+        adc_set_sample_time(ADC2, ADC_CHANNEL2, ADC_SMPR1_SMP_7DOT5CYC);
+        adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
+    }
+    else if(adc_mode == INTERLEAVED_ADC)
+    {
+        u8 channels1[] = {ADC_CHANNEL1};
+        u8 channels2[] = {ADC_CHANNEL1};
+        u8 channels3[] = {ADC_CHANNEL1};
+
+        adc_set_regular_sequence(ADC1, 1, channels1);
+        adc_set_regular_sequence(ADC2, 1, channels2);
+        adc_set_regular_sequence(ADC3, 1, channels3);
+
+        adc_disable_external_trigger_regular(ADC2);
+        adc_disable_external_trigger_regular(ADC3);
+        ADC_CCR &= ~(ADC_CCR_DMA_MASK | ADC_CCR_DDS);
+        ADC_CCR |= ADC_CCR_DMA_MODE_1 | ADC_CCR_DDS;
+        adc_set_multi_mode(ADC_CCR_MULTI_TRIPLE_INTERLEAVED);
+
+        adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR1_SMP_1DOT5CYC);
+        adc_set_sample_time(ADC2, ADC_CHANNEL1, ADC_SMPR1_SMP_1DOT5CYC);
+        adc_set_sample_time(ADC3, ADC_CHANNEL1, ADC_SMPR1_SMP_1DOT5CYC);
+        adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
     }
 
     adc_set_resolution(ADC1, ADC_CR1_RES_12BIT);
     adc_set_resolution(ADC2, ADC_CR1_RES_12BIT);
-
-    adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
+    adc_set_resolution(ADC3, ADC_CR1_RES_12BIT);
 
     adc_enable_dma(ADC1);
     adc_enable_dma(ADC2);
+    adc_enable_dma(ADC3);
     adc_set_dma_continue(ADC1);
     adc_set_dma_continue(ADC2);
+    adc_set_dma_continue(ADC3);
 
     adc_set_right_aligned(ADC1);
     adc_set_right_aligned(ADC2);
+
+	adc_set_right_aligned(ADC3);
     adc_power_on(ADC1);
     if(adc_mode == DUAL_ADC)
+    {
+	   adc_power_on(ADC2);
+    }
+    else if(adc_mode == OVERSAMPLED_ADC)
+    {
        adc_power_on(ADC2);
+       adc_power_on(ADC3);
+    }
 }
 
 void exti_timer_setup()
@@ -489,8 +547,9 @@ int main(void)
     gpio_mode_setup(GPIOD, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO15 | GPIO14 | GPIO13 | GPIO12);
     gpio_set_af(GPIOA, GPIO_AF10, GPIO9 | GPIO11 | GPIO12);
 
-    adc_mode = DUAL_ADC;
-    adc_mode = REGULAR_ADC;
+    adc_mode = OVERSAMPLED_ADC;
+    // adc_mode = DUAL_ADC;
+    // adc_mode = REGULAR_ADC;
     dma_setup();
     adc_setup();
     timer_setup();
@@ -592,11 +651,57 @@ void dma2_stream0_isr()
         {
             for(i = 0; i < DUAL_ADC_SHORTS/4; ++i)
             {
+                // TODO: double check rounding
+                // unsigned b0 = ((((dbuf0[i*4+0] * dbuf0[i*4+1]) >> 11) + 1) >> 1);
+                // unsigned b1 = ((((dbuf0[i*4+2] * dbuf0[i*4+3]) >> 11) + 1) >> 1);
                 unsigned b0 = (dbuf0[i*4+0] * dbuf0[i*4+1]) >> 12;
                 unsigned b1 = (dbuf0[i*4+2] * dbuf0[i*4+3]) >> 12;
                 data_bufs[head_ptr].data[i*3+1] = b0&0xFF;
                 data_bufs[head_ptr].data[i*3+2] = b1&0xFF;
                 data_bufs[head_ptr].data[i*3+3] = (b0>>8) | ((b1>>4)&0xF0);
+            }
+        }
+        else if(adc_mode == OVERSAMPLED_ADC)
+        {
+            unsigned voltage, b0, b1;
+            short c, dptr;
+            int j;
+
+            data_bufs[head_ptr].data[0] = tperiod>>(3-OVERSAMPLED_BITS);
+
+            for(i = 0, dptr = 1; i < OVERSAMPLED_ADC_SHORTS; i += OVERSAMPLED_RATIO*2*2)
+            {
+                unsigned short c_tot=0, v_tot=0;
+
+                for(j = i; j < i+OVERSAMPLED_RATIO*2; j += 2)
+                {
+                    c_tot += dbuf0[j];
+                    v_tot += dbuf0[j+1];
+                }
+                c_tot = c_tot >> OVERSAMPLED_BITS;
+                v_tot = v_tot >> OVERSAMPLED_BITS;
+
+                b0 = (c_tot * v_tot) >> 12;
+
+                c_tot=0;
+                v_tot=0;
+
+                for(; j < i+OVERSAMPLED_RATIO*2*2; j += 2)
+                {
+                    c_tot += dbuf0[j];
+                    v_tot += dbuf0[j+1];
+                }
+                c_tot = c_tot >> OVERSAMPLED_BITS;
+                v_tot = v_tot >> OVERSAMPLED_BITS;
+
+                b1 = (c_tot * v_tot) >> 12;
+
+                data_bufs[head_ptr].data[dptr] = b0&0xFF;
+                dptr++;
+                data_bufs[head_ptr].data[dptr] = b1&0xFF;
+                dptr++;
+                data_bufs[head_ptr].data[dptr] = (b0>>8) | ((b1>>4)&0xF0);
+                dptr++;
             }
         }
 
@@ -615,6 +720,8 @@ void dma2_stream0_isr()
                 err = (int)((float)err * ((float)sent_counter/(float)(NUM_BUFFERS)));
 
             tperiod -= ((err>>4) + ((err - lastErr)<<3));
+            if(tperiod < 8)
+                tperiod = 8;
             lastErr = err;
 
             timer_set_period(TIM2, tperiod >> 3);
