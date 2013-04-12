@@ -547,7 +547,14 @@ void dma2_stream0_isr()
         if(nhead >= NUM_BUFFERS)
             nhead -= NUM_BUFFERS;
         if(nhead == tail_ptr)
-            while(1);
+        {
+            // If this happens: bad.
+            // The mostly happens when the host application exits uncleanly
+            // and the device is still capturing
+            head_ptr = tail_ptr = 0;
+            stop_measurement();
+            return;
+        }
 
 
         head_ptr = nhead;
