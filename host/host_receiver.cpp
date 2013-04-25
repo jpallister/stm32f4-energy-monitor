@@ -52,7 +52,7 @@ void processCommand(string input)
     }
     else if (args[0] == "connect")
     {
-        auto devlist = LibusbInterface::listDevices(0x1337, 0x1337);
+        auto devlist = LibusbInterface::listDevices(0xF539, 0xF539);
         int i = 0;
 
         if(devlist.empty())
@@ -96,7 +96,7 @@ void processCommand(string input)
         }
 
         dQueue.reset(new queue<shared_array<unsigned char> >());
-        liObj = new LibusbInterface(&bmutex, dQueue.get(), 0x1337, 0x1337, chosen_serial);
+        liObj = new LibusbInterface(&bmutex, dQueue.get(), 0xF539, 0xF539, chosen_serial);
         dpObj = new DataProcessor(&bmutex, dQueue.get());
 
         thread1 = boost::thread(bind(&LibusbInterface::operator(),liObj));  // Bind prevents copying obj (need to keep ptr)
