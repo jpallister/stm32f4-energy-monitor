@@ -132,6 +132,60 @@ void processCommand(string input)
         cout << "    Setting serial to " << args[1] << endl;
         liObj->setSerial(args[1]);
     }
+    else if(args[0] == "setresistor")
+    {
+        smatch sm;
+        regex rx("([0-9.]+)");
+
+        if(regex_match(args[1], sm, rx))
+        {
+            float res_val = lexical_cast<float>(sm[1]);
+
+            cout << "    Setting resistor value to " << res_val << "Ω" << endl;
+            dpObj->setResistor(res_val);
+        }
+        else
+        {
+            cout << "Invalid resistor value" << endl;
+            return;
+        }
+    }
+    else if(args[0] == "setrefvoltage")
+    {
+        smatch sm;
+        regex rx("([0-9.]+)");
+
+        if(regex_match(args[1], sm, rx))
+        {
+            float res_val = lexical_cast<float>(sm[1]);
+
+            cout << "    Setting reference voltage to " << res_val << "V" << endl;
+            dpObj->setReferenceVoltage(res_val);
+        }
+        else
+        {
+            cout << "Invalid reference voltage" << endl;
+            return;
+        }
+    }
+    else if(args[0] == "setgain")
+    {
+        smatch sm;
+        regex rx("([0-9.]+)");
+
+        if(regex_match(args[1], sm, rx))
+        {
+            float res_val = lexical_cast<float>(sm[1]);
+
+            cout << "    Setting gain to " << res_val << endl;
+            dpObj->setGain(res_val);
+        }
+        else
+        {
+            cout << "Invalid gain value" << endl;
+            return;
+        }
+    }
     else if(args[0] == "trigger")
     {
         if(!connected)
@@ -249,6 +303,9 @@ void processCommand(string input)
         cout << "    setserial SERIAL            Set the serial number of current device" << endl;
         cout << "                                Reconnection required before new serial recognised" << endl;
         cout << "    leds                        Toggle the LEDs" << endl;
+        cout << "    setresistor RESISTOR        Set the value of the shunt resistor" << endl;
+        cout << "    setrefvoltage REFVOLTAGE    Set the value of the ADC reference voltage" << endl;
+        cout << "    setgain GAIN                Set the gain of the high side current amplifier" << endl;
         cout << "    start                       Start energy measurement" << endl;
         cout << "    stop                        Stop energy measurement" << endl;
         cout << "    trigger" << endl;

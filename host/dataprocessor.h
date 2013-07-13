@@ -24,6 +24,9 @@ public:
     void endSignal();
 
     void setAccumulation(bool);
+    void setResistor(float);
+    void setReferenceVoltage(float);
+    void setGain(float);
 private:
     boost::mutex *mQueue;
     std::queue<boost::shared_array<unsigned char> > *dQueue;
@@ -39,6 +42,13 @@ private:
     unsigned long cur_time;
 
     bool doAccumulation;
+
+    // Circuit parameters that are needed to calculate power
+    float resistor;
+    float referenceVoltage;
+    float gain;
+
+    float convertToPower(float v);
 
     void addDataItem(short, unsigned long);
 
