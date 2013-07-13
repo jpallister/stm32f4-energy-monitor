@@ -4,3 +4,4 @@ recv
 *.sublime-workspace
 *.s
 *.o
+*.i

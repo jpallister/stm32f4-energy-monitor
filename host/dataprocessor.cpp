@@ -21,6 +21,9 @@ DataProcessor::DataProcessor(boost::mutex *m, std::queue<boost::shared_array<uns
     last_tick = 0;
     switched = false;
     isEmpty = true;
+    resistor = 1.0;
+    gain = 50.0;
+    referenceVoltage = 3.0;
 }
 
 DataProcessor::~DataProcessor()
@@ -110,6 +113,7 @@ void DataProcessor::processData()
     int i, c = 0;
     short b1, b2;
     short rate = 0;
+    float power;
 
     for(i = 0; i < DATA_LEN; ++i, ++c)
     {
@@ -133,12 +137,14 @@ void DataProcessor::processData()
             b1 |= (data[i]&0x0F) << 8;
             b2 |= (data[i]&0xF0) << 4;
 
-            fprintf(output, "%d %lu\n", b1, cur_time);
-            addDataItem(b1, cur_time);
+            power = convertToPower(b1);
+            fprintf(output, "%f %lu\n", power, cur_time);
+            addDataItem(power, cur_time);
             cur_time += rate;
 
-            fprintf(output, "%d %lu\n", b2, cur_time);
-            addDataItem(b2, cur_time);
+            power = convertToPower(b2);
+            fprintf(output, "%f %lu\n", power, cur_time);
+            addDataItem(power, cur_time);
             cur_time += rate;
         }
     }
@@ -153,4 +159,25 @@ void DataProcessor::endSignal()
 void DataProcessor::setAccumulation(bool sa)
 {
     doAccumulation = sa;
+}
+
+void DataProcessor::setResistor(float res)
+{
+    resistor = res;
+}
+
+void DataProcessor::setReferenceVoltage(float v)
+{
+    referenceVoltage = v;
+}
+
+void DataProcessor::setGain(float v)
+{
+    gain = v;
+}
+
+float DataProcessor::convertToPower(float v)
+{
+    return double(v) * 4096. / 4095. / 4095. * double(referenceVoltage) * double(referenceVoltage)
+        * 2. / double(gain) / double(resistor);
 }

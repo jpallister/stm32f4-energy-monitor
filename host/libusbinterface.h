@@ -56,9 +56,6 @@ private:
     bool open_device();
     void close_device();
 
-    void send_start();
-    void send_end();
-
     // Send data to the data processor thread
     void send_data(boost::shared_array<unsigned char>);
 
