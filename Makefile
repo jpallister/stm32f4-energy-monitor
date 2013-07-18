@@ -1,4 +1,4 @@
-CC=~/sat_toolchain/bin/arm-none-eabi-gcc
+CC=arm-none-eabi-gcc
 
 FLAGS += -T libopencm3_stm32f4.ld
 FLAGS += -D STM32F4
@@ -8,8 +8,7 @@ FLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 
 SRC += energy_monitor.c
 
-
-HLFLAGS += -lboost_thread-mt -lusb-1.0 -lreadline -lboost_regex-mt
+HLFLAGS += -lboost_system -lboost_thread-mt -lusb-1.0 -lreadline -lboost_regex-mt
 HCFLAGS += -g -std=c++11 -O1
 
 HOST_SRC = host/host_receiver.o host/libusbinterface.o host/dataprocessor.o host/helper.o
