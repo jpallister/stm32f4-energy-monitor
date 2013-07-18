@@ -15,6 +15,18 @@
 #include <readline/history.h>
 #include <sys/types.h>
 
+#define CHECK_CONNECTED() \
+    if (!connected) { \
+        cout << "    Need to be connected" << endl; \
+        return; \
+    }
+
+#define CHECK_PARAMS() \
+    if (args.size() < 2) { \
+        cout << "Command expects parameters" << endl; \
+        return; \
+    }
+
 using namespace std;
 using namespace boost;
 
@@ -43,11 +55,7 @@ void processCommand(string input)
 
     if(args[0] == "cmd")
     {
-        // if(args.size() < 2)
-        // {
-        //     cout << "Command expects parameters" << endl;
-        //     return;
-        // }
+        // CHECK_PARAMS();
         // liObj->sendCommand(lexical_cast<int>(args[1]));
     }
     else if (args[0] == "connect")
@@ -107,23 +115,14 @@ void processCommand(string input)
     }
     else if(args[0] == "getserial")
     {
-        if(!connected)
-            cout << "    Need to be connected" << endl;
-        else
-            cout << "    Connected device, serial: " << chosen_serial << endl;
+        CHECK_CONNECTED();
+        cout << "    Connected device, serial: " << chosen_serial << endl;
     }
     else if(args[0] == "setserial")
     {
-        if(!connected)
-        {
-            cout << "    Need to be connected" << endl;
-            return;
-        }
-        if(args.size() < 2)
-        {
-            cout << "Command expects parameters" << endl;
-            return;
-        }
+        CHECK_CONNECTED();
+        CHECK_PARAMS();
+
         if(args[1].length() != 8)
         {
             cout << "Length of the serial string must be 8 characters" << endl;
@@ -173,38 +172,22 @@ void processCommand(string input)
     }
     else if(args[0] == "leds")
     {
-        if(!connected)
-        {
-            cout << "    Need to be connected" << endl;
-            return;
-        }
+        CHECK_CONNECTED();
         liObj->sendCommand(LibusbInterface::LED);
     }
     else if(args[0] == "start")
     {
-        if(!connected)
-        {
-            cout << "    Need to be connected" << endl;
-            return;
-        }
+        CHECK_CONNECTED();
         liObj->sendCommand(LibusbInterface::START);
     }
     else if(args[0] == "stop")
     {
-        if(!connected)
-        {
-            cout << "    Need to be connected" << endl;
-            return;
-        }
+        CHECK_CONNECTED();
         liObj->sendCommand(LibusbInterface::STOP);
     }
     else if(args[0] == "power")
     {
-        if(!connected)
-        {
-            cout << "    Need to be connected" << endl;
-            return;
-        }
+        CHECK_CONNECTED();
         if(args.size() < 2)
         {
             dpObj->setAccumulation(true);
@@ -217,16 +200,9 @@ void processCommand(string input)
     }
     else if(args[0] == "mode")
     {
-        if(!connected)
-        {
-            cout << "    Need to be connected" << endl;
-            return;
-        }
-        if(args.size() < 2)
-        {
-            cout << "Command expects parameters" << endl;
-            return;
-        }
+        CHECK_CONNECTED();
+        CHECK_PARAMS();
+
         if(args[1] == "normal")
         {
             liObj->setMode(LibusbInterface::NORMAL_ADC);
