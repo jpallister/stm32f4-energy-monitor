@@ -1,6 +1,4 @@
 #include <stdio.h>
-#include "libusbinterface.h"
-#include "dataprocessor.h"
 #include <boost/thread.hpp>
 #include <queue>
 #include <vector>
@@ -14,6 +12,10 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <sys/types.h>
+
+#include "config.h"
+#include "dataprocessor.h"
+#include "libusbinterface.h"
 
 #define CHECK_CONNECTED() \
     if (!connected) { \
