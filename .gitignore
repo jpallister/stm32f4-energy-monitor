@@ -4,3 +4,6 @@ recv
 *.sublime-workspace
 *.s
 *.o
+energy_monitor.i
+output_results
+*.swp

@@ -1,4 +1,5 @@
 #include "helper.h"
+#include <cstring>
 #include <iostream>
 #include <sys/types.h>
 #include <signal.h>

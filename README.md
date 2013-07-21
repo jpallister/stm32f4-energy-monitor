@@ -70,7 +70,7 @@ This will set the measurement to start on the first rising edge of PA0, and stop
 
 The following line may have to be added to a udev rule (energy monitor appears as device id 0xF539:0xF539):
 
-    ATTRS{idVendor}=="0539", ATTRS{idProduct}=="0539", MODE="0666", GROUP="plugd    ev"
+    ATTRS{idVendor}=="0539", ATTRS{idProduct}=="0539", MODE="0666", GROUP="plugdev"
 
 How it works
 ------------
