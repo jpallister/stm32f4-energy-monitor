@@ -179,8 +179,8 @@ void stop_measurement()
     adc_off(ADC3);
 }
 
-static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *req, u8 **buf,
-        u16 *len, void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
+static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *req, uint8_t **buf,
+        uint16_t *len, void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
 {
     int i;
 
@@ -210,7 +210,7 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
     }
     case 3:     // Set serial
     {
-        u32 base_addr = (u32) serial_str;
+        uint32_t base_addr = (uint32_t) serial_str;
 
         if(*len != 8)
             return 0;
@@ -219,9 +219,9 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
         flash_erase_sector(FLASH_CR_SECTOR_1, FLASH_CR_PROGRAM_X32);
         for(i = 0; i < 8 ;++i)
         {
-            flash_program_byte(base_addr+i, (*buf)[i], FLASH_CR_PROGRAM_X8);
+            flash_program_byte(base_addr+i, (*buf)[i]);
         }
-        flash_program_byte(base_addr+8, 0x0, FLASH_CR_PROGRAM_X8);
+        flash_program_byte(base_addr+8, 0x0);
         flash_lock();
 
         break;
@@ -268,7 +268,7 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
     return 1;
 }
 
-static void usbdev_data_rx_cb(usbd_device *usbd_dev, u8 ep)
+static void usbdev_data_rx_cb(usbd_device *usbd_dev, uint8_t ep)
 {
     (void)ep;
 
@@ -303,7 +303,7 @@ static void usb_reset_cb()
     running = 0;
 }
 
-static void usbdev_set_config(usbd_device *usbd_dev, u16 wValue)
+static void usbdev_set_config(usbd_device *usbd_dev, uint16_t wValue)
 {
     (void)wValue;
 
@@ -357,21 +357,21 @@ void dma_setup()
 
     if(adc_mode == REGULAR_ADC)
     {
-        dma_set_peripheral_address(DMA2, DMA_STREAM0, (u32)&ADC1_DR);
+        dma_set_peripheral_address(DMA2, DMA_STREAM0, (uint32_t)&ADC1_DR);
         dma_set_number_of_data(DMA2, DMA_STREAM0, REGULAR_ADC_SHORTS);
     }
     else if(adc_mode == OVERSAMPLED_ADC)
     {
-        dma_set_peripheral_address(DMA2, DMA_STREAM0, (u32)&ADC_CDR);
+        dma_set_peripheral_address(DMA2, DMA_STREAM0, (uint32_t)&ADC_CDR);
         dma_set_number_of_data(DMA2, DMA_STREAM0, OVERSAMPLED_ADC_SHORTS);
     }
     else
     {
-        dma_set_peripheral_address(DMA2, DMA_STREAM0, (u32)&ADC_CDR);
+        dma_set_peripheral_address(DMA2, DMA_STREAM0, (uint32_t)&ADC_CDR);
         dma_set_number_of_data(DMA2, DMA_STREAM0, DUAL_ADC_SHORTS);
     }
 
-    dma_set_memory_address(DMA2, DMA_STREAM0, (u32)&dbuf0);
+    dma_set_memory_address(DMA2, DMA_STREAM0, (uint32_t)&dbuf0);
     dma_set_transfer_mode(DMA2, DMA_STREAM0, DMA_SxCR_DIR_PERIPHERAL_TO_MEM);
     dma_enable_memory_increment_mode(DMA2, DMA_STREAM0);
     dma_set_peripheral_size(DMA2, DMA_STREAM0, DMA_SxCR_PSIZE_16BIT);
@@ -419,7 +419,7 @@ void adc_setup()
 
     if(adc_mode == REGULAR_ADC)
     {
-        u8 channels[] = {ADC_CHANNEL2, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1,
+        uint8_t channels[] = {ADC_CHANNEL2, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1,
             ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1,
             ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1};
         adc_set_regular_sequence(ADC1, 15, channels);
@@ -429,14 +429,14 @@ void adc_setup()
         ADC_CCR |= ADC_CCR_DMA_MODE_1;
         adc_set_multi_mode(ADC_CCR_MULTI_INDEPENDENT);
 
-        adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR1_SMP_1DOT5CYC);
-        adc_set_sample_time(ADC1, ADC_CHANNEL2, ADC_SMPR1_SMP_1DOT5CYC);
+        adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR_SMP_3CYC);
+        adc_set_sample_time(ADC1, ADC_CHANNEL2, ADC_SMPR_SMP_3CYC);
         adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
     }
     else if(adc_mode == DUAL_ADC || adc_mode == OVERSAMPLED_ADC)
     {
-        u8 channels1[] = {ADC_CHANNEL1};
-        u8 channels2[] = {ADC_CHANNEL2};
+        uint8_t channels1[] = {ADC_CHANNEL1};
+        uint8_t channels2[] = {ADC_CHANNEL2};
         adc_set_regular_sequence(ADC1, 1, channels1);
         adc_set_regular_sequence(ADC2, 1, channels2);
 
@@ -445,15 +445,15 @@ void adc_setup()
         ADC_CCR |= ADC_CCR_DMA_MODE_1 | ADC_CCR_DDS;
         adc_set_multi_mode(ADC_CCR_MULTI_DUAL_REG_SIMUL_AND_INJECTED_SIMUL);
 
-        adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR1_SMP_7DOT5CYC);
-        adc_set_sample_time(ADC2, ADC_CHANNEL2, ADC_SMPR1_SMP_7DOT5CYC);
+        adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR_SMP_15CYC);
+        adc_set_sample_time(ADC2, ADC_CHANNEL2, ADC_SMPR_SMP_15CYC);
         adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
     }
     else if(adc_mode == INTERLEAVED_ADC)
     {
-        u8 channels1[] = {ADC_CHANNEL1};
-        u8 channels2[] = {ADC_CHANNEL1};
-        u8 channels3[] = {ADC_CHANNEL1};
+        uint8_t channels1[] = {ADC_CHANNEL1};
+        uint8_t channels2[] = {ADC_CHANNEL1};
+        uint8_t channels3[] = {ADC_CHANNEL1};
 
         adc_set_regular_sequence(ADC1, 1, channels1);
         adc_set_regular_sequence(ADC2, 1, channels2);
@@ -465,9 +465,9 @@ void adc_setup()
         ADC_CCR |= ADC_CCR_DMA_MODE_1 | ADC_CCR_DDS;
         adc_set_multi_mode(ADC_CCR_MULTI_TRIPLE_INTERLEAVED);
 
-        adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR1_SMP_1DOT5CYC);
-        adc_set_sample_time(ADC2, ADC_CHANNEL1, ADC_SMPR1_SMP_1DOT5CYC);
-        adc_set_sample_time(ADC3, ADC_CHANNEL1, ADC_SMPR1_SMP_1DOT5CYC);
+        adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR_SMP_3CYC);
+        adc_set_sample_time(ADC2, ADC_CHANNEL1, ADC_SMPR_SMP_3CYC);
+        adc_set_sample_time(ADC3, ADC_CHANNEL1, ADC_SMPR_SMP_3CYC);
         adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
     }
 
@@ -558,7 +558,7 @@ int main(void)
     gpio_toggle(GPIOA, GPIO12);
 
 
-    usbd_dev = usbd_init(&otgfs_usb_driver, &dev, &config, usb_strings, 3);
+    usbd_dev = usbd_init(&otgfs_usb_driver, &dev, &config, usb_strings, 3, NULL, 0);
     usbd_register_set_config_callback(usbd_dev, usbdev_set_config);
 
     while (1)
