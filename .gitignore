@@ -5,3 +5,5 @@ recv
 *.s
 *.o
 *.i
+output_results
+*.swp
