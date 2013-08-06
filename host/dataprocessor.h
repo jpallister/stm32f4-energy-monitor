@@ -27,6 +27,10 @@ public:
     void setResistor(float);
     void setReferenceVoltage(float);
     void setGain(float);
+
+    int closeOutput();
+    int openOutput();
+    int openOutput(std::string output_loc);
 private:
     boost::mutex *mQueue;
     std::queue<boost::shared_array<unsigned char> > *dQueue;

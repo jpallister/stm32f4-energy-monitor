@@ -6,6 +6,8 @@
 #include "helper.h"
 #include <math.h>
 
+#define DEFAULT_OUTPUT "output_results"
+
 using namespace std;
 using namespace boost;
 using namespace boost::accumulators;
@@ -15,7 +17,6 @@ DataProcessor::DataProcessor(boost::mutex *m, std::queue<boost::shared_array<uns
     mQueue = m;
     dQueue = d;
     status = 0;
-    output = fopen("output_results", "w");
     cur_time = 0;
     doAccumulation = false;
     last_tick = 0;
@@ -24,15 +25,12 @@ DataProcessor::DataProcessor(boost::mutex *m, std::queue<boost::shared_array<uns
     resistor = 1.0;
     gain = 50.0;
     referenceVoltage = 3.0;
+    /* Don't set output. This should be done with openOutput. */
 }
 
 DataProcessor::~DataProcessor()
 {
-    if(output)
-    {
-        fclose(output);
-        output = NULL;
-    }
+    DataProcessor::closeOutput();
 }
 
 void DataProcessor::operator()()
@@ -180,4 +178,37 @@ float DataProcessor::convertToPower(float v)
 {
     return double(v) * 4096. / 4095. / 4095. * double(referenceVoltage) * double(referenceVoltage)
         * 2. / double(gain) / double(resistor);
+}
+
+int DataProcessor::closeOutput()
+{
+    int to_return = 0;
+    if (output)
+    {
+        to_return = fclose(output);
+        output = NULL;
+    }
+
+    return to_return;
+}
+
+int DataProcessor::openOutput()
+{
+    openOutput(DEFAULT_OUTPUT);
+}
+
+int DataProcessor::openOutput(std::string output_loc)
+{
+    int to_return = 0;
+    if (!output)
+    {
+        output = fopen(output_loc.c_str(), "w");
+        to_return = (output == NULL);
+    }
+    else
+    {
+        to_return = -1;
+    }
+
+    return to_return;
 }
