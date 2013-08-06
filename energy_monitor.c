@@ -532,6 +532,7 @@ int main(void)
 {
     int c_started=0, n, cpy;
     short s;
+    uint8_t control_buffer[128];
 
     rcc_clock_setup_hse_3v3(&hse_8mhz_3v3[CLOCK_3V3_168MHZ]);
 
@@ -558,7 +559,7 @@ int main(void)
     gpio_toggle(GPIOA, GPIO12);
 
 
-    usbd_dev = usbd_init(&otgfs_usb_driver, &dev, &config, usb_strings, 3, NULL, 0);
+    usbd_dev = usbd_init(&otgfs_usb_driver, &dev, &config, usb_strings, 3, control_buffer, 128);
     usbd_register_set_config_callback(usbd_dev, usbdev_set_config);
 
     while (1)
