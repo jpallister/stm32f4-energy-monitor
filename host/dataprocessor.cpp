@@ -26,6 +26,7 @@ DataProcessor::DataProcessor(boost::mutex *m, std::queue<boost::shared_array<uns
     gain = 50.0;
     referenceVoltage = 3.0;
     /* Don't set output. This should be done with openOutput. */
+    output = NULL;
 }
 
 DataProcessor::~DataProcessor()
@@ -136,12 +137,18 @@ void DataProcessor::processData()
             b2 |= (data[i]&0xF0) << 4;
 
             power = convertToPower(b1);
-            fprintf(output, "%f %lu\n", power, cur_time);
+            if (DataProcessor::openedFile())
+            {
+                fprintf(output, "%f %lu\n", power, cur_time);
+            }
             addDataItem(power, cur_time);
             cur_time += rate;
 
             power = convertToPower(b2);
-            fprintf(output, "%f %lu\n", power, cur_time);
+            if (DataProcessor::openedFile())
+            {
+                fprintf(output, "%f %lu\n", power, cur_time);
+            }
             addDataItem(power, cur_time);
             cur_time += rate;
         }
@@ -182,6 +189,11 @@ float DataProcessor::convertToPower(float v)
 
 int DataProcessor::closeOutput()
 {
+    if (status == 1)
+    {
+        return 1;
+    }
+
     int to_return = 0;
     if (output)
     {
@@ -211,4 +223,9 @@ int DataProcessor::openOutput(std::string output_loc)
     }
 
     return to_return;
+}
+
+int DataProcessor::openedFile()
+{
+    return (output != NULL);
 }

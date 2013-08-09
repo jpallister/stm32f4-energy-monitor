@@ -45,7 +45,10 @@ bool connected = false;
 void ctrlc_handler(int _)
 {
     liObj->endSignal();
-    dpObj->endSignal();
+    if (dpObj)
+    {
+        dpObj->endSignal();
+    }
     running = false;
 }
 
@@ -103,6 +106,7 @@ void processCommand(string input)
             thread2.join();
             delete liObj;
             delete dpObj;
+            dpObj = NULL;
         }
 
         dQueue.reset(new queue<shared_array<unsigned char> >());
@@ -110,7 +114,6 @@ void processCommand(string input)
         dpObj = new DataProcessor(&bmutex, dQueue.get());
 
         thread1 = boost::thread(bind(&LibusbInterface::operator(),liObj));  // Bind prevents copying obj (need to keep ptr)
-        thread2 = boost::thread(bind(&DataProcessor::operator(),dpObj));
 
         connected = true;
         cout << "    Connected to device, serial: " << chosen_serial << endl;
@@ -234,11 +237,41 @@ void processCommand(string input)
     else if(args[0] == "start")
     {
         CHECK_CONNECTED();
+
+        /* Relies on us always using thread2.join() before dpObjs deletion */
+        if (thread2.joinable())
+        {
+            cout << "Already started!" << endl;
+            return;
+        }
+
+        if (args.size() == 2)
+        {
+            dpObj->openOutput(args[1]);
+        }
+        else
+        {
+            dpObj->openOutput();
+        }
+
+        if (!dpObj->openedFile())
+        {
+            cout << "An output file is not open ";
+            cout << "so no results will be recorded" << endl;
+        }
+
+        thread2 = boost::thread(bind(&DataProcessor::operator(),dpObj));
         liObj->sendCommand(LibusbInterface::START);
     }
     else if(args[0] == "stop")
     {
         CHECK_CONNECTED();
+
+        dpObj->endSignal();
+        thread2.join();
+        dpObj->closeOutput();
+        delete dpObj;
+        dpObj = new DataProcessor(&bmutex, dQueue.get());
         liObj->sendCommand(LibusbInterface::STOP);
     }
     else if(args[0] == "power")
@@ -284,7 +317,7 @@ void processCommand(string input)
         cout << "    setresistor RESISTOR        Set the value of the shunt resistor" << endl;
         cout << "    setrefvoltage REFVOLTAGE    Set the value of the ADC reference voltage" << endl;
         cout << "    setgain GAIN                Set the gain of the high side current amplifier" << endl;
-        cout << "    start                       Start energy measurement" << endl;
+        cout << "    start [FILE]                Start energy measurement, collecting results into FILE (output_results by default)" << endl;
         cout << "    stop                        Stop energy measurement" << endl;
         cout << "    trigger" << endl;
         cout << "             PIN                Trigger measurement on PIN (e.g PA0)" << endl;
