@@ -1,4 +1,3 @@
-#include <python.h>
 #include <boost/python.hpp>
 #include <libusb-1.0/libusb.h>
 #include <readline/readline.h>
