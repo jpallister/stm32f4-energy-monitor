@@ -137,9 +137,13 @@ am__uninstall_files_from_dir = { \
 am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
-pyenergy_la_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+am__DEPENDENCIES_2 = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
-am_pyenergy_la_OBJECTS = pyenergy_la-pymodule.lo
+pyenergy_la_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_2)
+am__objects_1 = pyenergy_la-helper.lo pyenergy_la-dataprocessor.lo \
+	pyenergy_la-libusbinterface.lo pyenergy_la-host_receiver.lo
+am_pyenergy_la_OBJECTS = $(am__objects_1) pyenergy_la-pymodule.lo
 pyenergy_la_OBJECTS = $(am_pyenergy_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -387,13 +391,13 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 lib_LTLIBRARIES = pyenergy.la
 host_receiver_SOURCES = helper.cpp dataprocessor.cpp libusbinterface.cpp host_receiver.cpp
-pyenergy_la_SOURCES = pymodule.cpp host_receiver-host_receiver.o
+pyenergy_la_SOURCES = $(host_receiver_SOURCES) pymodule.cpp
 host_receiver_CPPFLAGS = $(BOOST_CPPFLAGS)
 host_receiver_LDADD = $(BOOST_REGEX_LIBS) $(BOOST_THREAD_LIBS) $(BOOST_SYSTEM_LIBS)
 host_receiver_LDFLAGS = $(BOOST_REGEX_LDFLAGS) $(BOOST_THREAD_LDFLAGS) $(BOOST_SYSTEM_LDFLAGS)
 pyenergy_la_CPPFLAGS = $(PYTHON_CPPFLAGS)
-pyenergy_la_LIBADD = $(BOOST_PYTHON_LIBS) $(BOOST_PYTHON3_LIBS) $(PYTHON_LIBS)
-pyenergy_la_LDFLAGS = $(BOOST_PYTHON_LDFLAGS) $(BOOST_PYTHON3_LDFLAGS) -module -shared -avoid-version
+pyenergy_la_LIBADD = $(BOOST_PYTHON_LIBS) $(BOOST_PYTHON3_LIBS) $(PYTHON_LIBS) $(host_receiver_LDADD)
+pyenergy_la_LDFLAGS = $(BOOST_PYTHON_LDFLAGS) $(BOOST_PYTHON3_LDFLAGS) -module -shared -avoid-version $(host_receiver_LDFLAGS)
 ACLOCAL_AMFLAGS = -Im4
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
@@ -551,6 +555,10 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/host_receiver-helper.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/host_receiver-host_receiver.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/host_receiver-libusbinterface.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pyenergy_la-dataprocessor.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pyenergy_la-helper.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pyenergy_la-host_receiver.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pyenergy_la-libusbinterface.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pyenergy_la-pymodule.Plo@am__quote@
 
 .cpp.o:
@@ -573,6 +581,34 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LTCXXCOMPILE) -c -o $@ $<
+
+pyenergy_la-helper.lo: helper.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(pyenergy_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT pyenergy_la-helper.lo -MD -MP -MF $(DEPDIR)/pyenergy_la-helper.Tpo -c -o pyenergy_la-helper.lo `test -f 'helper.cpp' || echo '$(srcdir)/'`helper.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/pyenergy_la-helper.Tpo $(DEPDIR)/pyenergy_la-helper.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='helper.cpp' object='pyenergy_la-helper.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(pyenergy_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o pyenergy_la-helper.lo `test -f 'helper.cpp' || echo '$(srcdir)/'`helper.cpp
+
+pyenergy_la-dataprocessor.lo: dataprocessor.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(pyenergy_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT pyenergy_la-dataprocessor.lo -MD -MP -MF $(DEPDIR)/pyenergy_la-dataprocessor.Tpo -c -o pyenergy_la-dataprocessor.lo `test -f 'dataprocessor.cpp' || echo '$(srcdir)/'`dataprocessor.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/pyenergy_la-dataprocessor.Tpo $(DEPDIR)/pyenergy_la-dataprocessor.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='dataprocessor.cpp' object='pyenergy_la-dataprocessor.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(pyenergy_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o pyenergy_la-dataprocessor.lo `test -f 'dataprocessor.cpp' || echo '$(srcdir)/'`dataprocessor.cpp
+
+pyenergy_la-libusbinterface.lo: libusbinterface.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(pyenergy_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT pyenergy_la-libusbinterface.lo -MD -MP -MF $(DEPDIR)/pyenergy_la-libusbinterface.Tpo -c -o pyenergy_la-libusbinterface.lo `test -f 'libusbinterface.cpp' || echo '$(srcdir)/'`libusbinterface.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/pyenergy_la-libusbinterface.Tpo $(DEPDIR)/pyenergy_la-libusbinterface.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libusbinterface.cpp' object='pyenergy_la-libusbinterface.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(pyenergy_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o pyenergy_la-libusbinterface.lo `test -f 'libusbinterface.cpp' || echo '$(srcdir)/'`libusbinterface.cpp
+
+pyenergy_la-host_receiver.lo: host_receiver.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(pyenergy_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT pyenergy_la-host_receiver.lo -MD -MP -MF $(DEPDIR)/pyenergy_la-host_receiver.Tpo -c -o pyenergy_la-host_receiver.lo `test -f 'host_receiver.cpp' || echo '$(srcdir)/'`host_receiver.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/pyenergy_la-host_receiver.Tpo $(DEPDIR)/pyenergy_la-host_receiver.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='host_receiver.cpp' object='pyenergy_la-host_receiver.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(pyenergy_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o pyenergy_la-host_receiver.lo `test -f 'host_receiver.cpp' || echo '$(srcdir)/'`host_receiver.cpp
 
 pyenergy_la-pymodule.lo: pymodule.cpp
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(pyenergy_la_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT pyenergy_la-pymodule.lo -MD -MP -MF $(DEPDIR)/pyenergy_la-pymodule.Tpo -c -o pyenergy_la-pymodule.lo `test -f 'pymodule.cpp' || echo '$(srcdir)/'`pymodule.cpp
@@ -1001,8 +1037,6 @@ uninstall-am: uninstall-binPROGRAMS uninstall-libLTLIBRARIES
 	tags tags-am uninstall uninstall-am uninstall-binPROGRAMS \
 	uninstall-libLTLIBRARIES
 
-
-pyenergy_la-pymodule.o: host_receiver-host_receiver.o
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
