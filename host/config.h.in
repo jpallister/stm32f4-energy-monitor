@@ -3,6 +3,9 @@
 /* Defined if the requested minimum BOOST version is satisfied */
 #undef HAVE_BOOST
 
+/* Define to 1 if you have <boost/python.hpp> */
+#undef HAVE_BOOST_PYTHON_HPP
+
 /* Define to 1 if you have <boost/regex.hpp> */
 #undef HAVE_BOOST_REGEX_HPP
 
