@@ -746,25 +746,12 @@ void exti_isr()
 
     gpio_toggle(GPIOD, GPIO13);
 
-
     if(status == -1)
     {
-        status = gpio_get(trigger_port, trigger_pin);
-        timer_enable_counter(TIM3);
-        timer_set_counter(TIM3, 0);
-    }
-}
-
-void tim3_isr()
-{
-    TIM_SR(TIM3) &= ~TIM_SR_UIF;
-    if(gpio_get(trigger_port, trigger_pin))
-    {
         gpio_toggle(GPIOD, GPIO12);
-        timer_disable_counter(TIM3);
-        status = -1;
         send_int = 1;
-        if(running == 0)
+
+        if (gpio_get(trigger_port, trigger_pin))
         {
             interrupt_buf[0] = 1;
             start_measurement();
@@ -774,7 +761,19 @@ void tim3_isr()
             interrupt_buf[0] = 2;
             stop_measurement();
         }
+
+        // Timeout to ignore other spurious edges
+        status = gpio_get(trigger_port, trigger_pin);
+        timer_enable_counter(TIM3);
+        timer_set_counter(TIM3, 0);
     }
+}
+
+void tim3_isr()
+{
+    TIM_SR(TIM3) &= ~TIM_SR_UIF;
+    timer_disable_counter(TIM3);
+    status = -1;
 }
 
 void exit(int a)
