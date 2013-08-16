@@ -7,3 +7,13 @@ recv
 *.i
 output_results
 *.swp
+.deps
+.libs
+host/Makefile
+autom4te.cache
+config.log
+config.status
+libtool
+pyenergy.la
+*.lo
+stamp-h1
