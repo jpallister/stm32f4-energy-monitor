@@ -12,7 +12,7 @@ using namespace std;
 using namespace boost;
 using namespace boost::accumulators;
 
-DataProcessor::DataProcessor(boost::mutex *m, std::queue<boost::shared_array<unsigned char> > *d)
+DataProcessor::DataProcessor(boost::mutex *m, std::queue<DataSet> *d)
 {
     mQueue = m;
     dQueue = d;
@@ -114,43 +114,58 @@ void DataProcessor::processData()
     short rate = 0;
     float power;
 
-    for(i = 0; i < DATA_LEN; ++i, ++c)
+    if (data.type == COMMAND)
     {
-        if(i % 64 == 0)
+        switch (data.data[0])
         {
-
-            rate = data[i];
-            // printf("%d\n", rate);
-            c = 2;
+            case LibusbInterface::START:
+                this->openOutput();
+                break;
+            case LibusbInterface::STOP:
+                this->closeOutput();
+                break;
         }
-        else if(c % 3 == 0)
+    }
+    else
+    {
+        for(i = 0; i < DATA_LEN; ++i, ++c)
         {
-            b1 = data[i];
-        }
-        else if(c % 3 == 1)
-        {
-            b2 = data[i];
-        }
-        else
-        {
-            b1 |= (data[i]&0x0F) << 8;
-            b2 |= (data[i]&0xF0) << 4;
-
-            power = convertToPower(b1);
-            if (DataProcessor::openedFile())
+            if(i % 64 == 0)
             {
-                fprintf(output, "%f %lu\n", power, cur_time);
-            }
-            addDataItem(power, cur_time);
-            cur_time += rate;
 
-            power = convertToPower(b2);
-            if (DataProcessor::openedFile())
-            {
-                fprintf(output, "%f %lu\n", power, cur_time);
+                rate = data.data[i];
+                // printf("%d\n", rate);
+                c = 2;
             }
-            addDataItem(power, cur_time);
-            cur_time += rate;
+            else if(c % 3 == 0)
+            {
+                b1 = data.data[i];
+            }
+            else if(c % 3 == 1)
+            {
+                b2 = data.data[i];
+            }
+            else
+            {
+                b1 |= (data.data[i]&0x0F) << 8;
+                b2 |= (data.data[i]&0xF0) << 4;
+
+                power = convertToPower(b1);
+                if (DataProcessor::openedFile())
+                {
+                    fprintf(output, "%f %lu\n", power, cur_time);
+                }
+                addDataItem(power, cur_time);
+                cur_time += rate;
+
+                power = convertToPower(b2);
+                if (DataProcessor::openedFile())
+                {
+                    fprintf(output, "%f %lu\n", power, cur_time);
+                }
+                addDataItem(power, cur_time);
+                cur_time += rate;
+            }
         }
     }
 }

@@ -9,10 +9,20 @@
 
 #define DATA_LEN    2048
 
+enum DataSetType {
+    ENERGY_DATA = 0,
+    COMMAND = 1
+};
+
+struct DataSet {
+    boost::shared_array<unsigned char> data;
+    DataSetType type;
+};
+
 class LibusbInterface
 {
 public:
-    LibusbInterface(boost::mutex *, std::queue<boost::shared_array<unsigned char> > *, unsigned idVendor, unsigned idProduct, std::string serialId);
+    LibusbInterface(boost::mutex *, std::queue<DataSet> *, unsigned idVendor, unsigned idProduct, std::string serialId);
     ~LibusbInterface();
     void operator()();
     void endSignal();
@@ -42,7 +52,7 @@ public:
 private:
     boost::mutex *mQueue;
     boost::mutex cQueueMutex;
-    std::queue<boost::shared_array<unsigned char> > *dQueue;
+    std::queue<DataSet> *dQueue;
 
     // Attributes to look for in the USB devices
     unsigned idProduct, idVendor;
@@ -57,7 +67,7 @@ private:
     void close_device();
 
     // Send data to the data processor thread
-    void send_data(boost::shared_array<unsigned char>);
+    void send_data(DataSet);
 
     int status;
     libusb_device_handle *devh;

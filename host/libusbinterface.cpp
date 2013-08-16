@@ -11,7 +11,7 @@ using namespace boost;
 // using namespace boost::bind;
 using namespace std;
 
-LibusbInterface::LibusbInterface(boost::mutex *m, queue<shared_array<unsigned char> > *d,
+LibusbInterface::LibusbInterface(boost::mutex *m, queue<DataSet> *d,
     unsigned idVendor, unsigned idProduct, string serialId)
 {
     mQueue = m;
@@ -243,13 +243,12 @@ void LibusbInterface::close_device()
     }
 }
 
-void LibusbInterface::send_data(shared_array<unsigned char> data)
+void LibusbInterface::send_data(DataSet data)
 {
     boost::mutex::scoped_lock lock(*mQueue);
 
     dQueue->push(data);
 }
-
 
 void LIBUSB_CALL LibusbInterface::transfer_callback(struct libusb_transfer *transfer)
 {
@@ -280,9 +279,12 @@ void LIBUSB_CALL LibusbInterface::transfer_callback(struct libusb_transfer *tran
     // printf("cb %d\n", _this->data_buf[0]);
     _this->total_len += DATA_LEN;
 
-    shared_array<unsigned char> data(new unsigned char[DATA_LEN]);
+    DataSet data;
+    shared_array<unsigned char> dataSet(new unsigned char[DATA_LEN]);
+    data.data = dataSet;
+    data.type = ENERGY_DATA;
 
-    memcpy(data.get(), _this->data_buf, DATA_LEN);
+    memcpy(data.data.get(), _this->data_buf, DATA_LEN);
     _this->send_data(data);
 
     if((r=libusb_submit_transfer(transfer)) < 0)
@@ -324,6 +326,7 @@ void LIBUSB_CALL LibusbInterface::interrupt_callback(struct libusb_transfer *tra
         mt_end_output();
         if(!_this->running)
         {
+            _this->sendCommand(START);
             libusb_submit_transfer(_this->energy_transfer);
         }
         _this->running = true;
@@ -335,6 +338,7 @@ void LIBUSB_CALL LibusbInterface::interrupt_callback(struct libusb_transfer *tra
         mt_end_output();
         if(_this->running)
         {
+            _this->sendCommand(STOP);
             libusb_cancel_transfer(_this->energy_transfer);
         }
         _this->running = false;
@@ -364,6 +368,13 @@ void LibusbInterface::sendCommand(CommandType cmd)
     boost::mutex::scoped_lock lock(cQueueMutex);
     LibusbInterface::CommandData cd = {cmd, ""};
     cQueue.push(cd);
+
+    DataSet data;
+    shared_array<unsigned char> dataSet(new unsigned char[1]);
+    data.data = dataSet;
+    data.type = COMMAND;
+    data.data[0] = cmd;
+    this->send_data(data);
 }
 
 void LibusbInterface::setSerial(string ser)
