@@ -16,7 +16,7 @@ DataProcessor::DataProcessor(boost::mutex *m, std::queue<boost::shared_array<uns
 {
     mQueue = m;
     dQueue = d;
-    status = 0;
+    status = RUNNING;
     cur_time = 0;
     doAccumulation = false;
     last_tick = 0;
@@ -39,10 +39,10 @@ void DataProcessor::operator()()
     int t1, t2;
 
     t1 = time(0);
-    while(status == 0 || !isEmpty)
+    while(status == RUNNING || !isEmpty)
     {
         getData();
-        if(status != 0 && isEmpty)
+        if(status != RUNNING && isEmpty)
             continue;
         processData();
         // printf("gda\n");
@@ -78,7 +78,7 @@ void DataProcessor::getData()
             isEmpty = true;
         }
         sleep(1);
-    } while(status == 0);
+    } while(status == RUNNING);
 
 }
 
@@ -157,7 +157,7 @@ void DataProcessor::processData()
 
 void DataProcessor::endSignal()
 {
-    status = 1;
+    status = IDLE;
 }
 
 
@@ -189,7 +189,7 @@ float DataProcessor::convertToPower(float v)
 
 int DataProcessor::closeOutput()
 {
-    if (status == 1)
+    if (status == RUNNING)
     {
         return 1;
     }

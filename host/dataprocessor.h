@@ -33,6 +33,11 @@ public:
     int openOutput(std::string output_loc);
     int openedFile();
 private:
+    enum RunningStatus {
+        RUNNING,
+        IDLE
+    };
+
     boost::mutex *mQueue;
     std::queue<boost::shared_array<unsigned char> > *dQueue;
     boost::shared_array<unsigned char> data;
