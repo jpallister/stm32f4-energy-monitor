@@ -11,6 +11,8 @@
 #include <boost/accumulators/statistics/min.hpp>
 #include <boost/accumulators/statistics/max.hpp>
 
+#include "libusbinterface.h"
+
 #define TIMER_SECOND_TICKS      84000000
 
 namespace _ba =  boost::accumulators;
@@ -18,7 +20,7 @@ namespace _ba =  boost::accumulators;
 class DataProcessor
 {
 public:
-    DataProcessor(boost::mutex *, std::queue<boost::shared_array<unsigned char> > *);
+    DataProcessor(boost::mutex *, std::queue<DataSet> *);
     ~DataProcessor();
     void operator()();
     void endSignal();
@@ -33,9 +35,14 @@ public:
     int openOutput(std::string output_loc);
     int openedFile();
 private:
+    enum RunningStatus {
+        RUNNING,
+        IDLE
+    };
+
     boost::mutex *mQueue;
-    std::queue<boost::shared_array<unsigned char> > *dQueue;
-    boost::shared_array<unsigned char> data;
+    std::queue<DataSet> *dQueue;
+    DataSet data;
 
     int status;
     bool isEmpty;
