@@ -2,19 +2,25 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([stm32-host-receiver], [0.0.1], [BUG-REPORT-ADDRESS])
+AC_INIT([stm32f4-energy-monitor], [1.0], [james.pallister@embecosm.com])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([build-aux])
 AM_INIT_AUTOMAKE
+AC_PROG_LIBTOOL
 LT_INIT
-AC_CONFIG_SRCDIR([host_receiver.cpp])
+AC_CONFIG_SRCDIR([src/host/host_receiver.cpp])
 AC_CONFIG_HEADERS([config.h])
 
 AC_LANG([C++])
 
-# Checks for programs.
 AC_PROG_CXX
 AC_PROG_CC
+
+AC_PROG_CC([arm-none-eabi-gcc])
+
+# TODO check if a suitable arm compiler exists
+# Check to see if it can compile code for cortex-m4f
+# Check to see if libopencm3 is available
 
 # Check for compiler flags.
 AX_CXX_COMPILE_STDCXX_11([noext],[mandatory])
@@ -25,8 +31,11 @@ BOOST_REGEX([n])
 BOOST_THREADS([n])
 BOOST_SYSTEM([n])
 
-AC_CHECK_LIB([readline], [main],, [AC_MSG_ERROR([Cannot find readline library. Please install it.])])
-AC_CHECK_LIB([usb-1.0], [main],, [AC_MSG_ERROR([Cannot find usb-1.0 library. Please install it.])])
+# Save libraries (don't want to compile energy_monitor with them)
+save_LIBS="$LIBS"
+AC_CHECK_LIB([readline], [main], [], [AC_MSG_ERROR([Cannot find readline library. Please install it.])])
+AC_CHECK_LIB([usb-1.0], [main], [], [AC_MSG_ERROR([Cannot find usb-1.0 library. Please install it.])])
+LIBS="$save_LIBS"
 
 # Python checking adapted from gdb's configure.ac
 # It's license, and original code can be obtained from
@@ -53,8 +62,14 @@ AC_DEFUN([AC_TRY_LIBPYTHON],
     esac
     found_usable_python=no
     AC_MSG_CHECKING([for ${version}])
-    AC_LINK_IFELSE(AC_LANG_PROGRAM([[#include "Python.h"]],
-                   [[Py_Initialize ();]]),
+    AC_LINK_IFELSE([AC_LANG_SOURCE([AC_LANG_PROGRAM(
+                    [[
+                        #include "Python.h"
+                    ]],
+
+                    [[
+                        Py_Initialize ();
+                    ]])])],
                    [have_libpython_var=${version}
                     found_usable_python=yes
                     PYTHON_CPPFLAGS=$new_CPPFLAGS
@@ -67,12 +82,18 @@ AC_DEFUN([AC_TRY_LIBPYTHON],
 AC_ARG_WITH(python,
             AS_HELP_STRING([--with-python=PYTHON], [also build host receiver as a python module (/path/to/python)]),
             [],
+            [with_python=`which python`])
+AC_ARG_WITH(python,
+            [AS_HELP_STRING([--without-python],[disable building of host receiver as a python module])],
+            [],
             [with_python=no])
+
 AC_MSG_CHECKING([whether to use python])
 AC_MSG_RESULT([$with_python])
 
 if test "${with_python}" = no; then
     AC_MSG_WARN([python module will not be compiled])
+    have_libpython=no
 else
     python_bin="${with_python}"
     if test ! -f "${python_bin}"; then
@@ -108,15 +129,8 @@ else
 fi
 AC_SUBST(PYTHON_CPPFLAGS)
 AC_SUBST(PYTHON_LIBS)
+AM_CONDITIONAL([BUILD_PYMODULE], [test x$have_libpython != xno])
 
-# Checks for header files.
 
-# Checks for typedefs, structures, and compiler characteristics.
-AC_CHECK_HEADER_STDBOOL
-AC_TYPE_SSIZE_T
-
-# Checks for library functions.
-AC_CHECK_FUNCS([sqrt])
-
-AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([Makefile src/host/Makefile src/firmware/Makefile])
 AC_OUTPUT
