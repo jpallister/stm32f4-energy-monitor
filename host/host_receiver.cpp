@@ -34,7 +34,7 @@ using namespace std;
 using namespace boost;
 
 boost::mutex bmutex;
-scoped_ptr<queue<shared_array<unsigned char> > > dQueue;
+scoped_ptr<queue<DataSet> > dQueue;
 LibusbInterface *liObj;
 DataProcessor *dpObj;
 boost::thread thread1, thread2;
@@ -46,10 +46,7 @@ bool connected = false;
 void ctrlc_handler(int _)
 {
     liObj->endSignal();
-    if (dpObj)
-    {
-        dpObj->endSignal();
-    }
+    dpObj->endSignal();
     running = false;
 }
 
@@ -104,11 +101,12 @@ void cmd_connect_to(string connect_to)
         dpObj = NULL;
     }
 
-    dQueue.reset(new queue<shared_array<unsigned char> >());
+    dQueue.reset(new queue<DataSet>());
     liObj = new LibusbInterface(&bmutex, dQueue.get(), 0xF539, 0xF539, chosen_serial);
     dpObj = new DataProcessor(&bmutex, dQueue.get());
 
     thread1 = boost::thread(bind(&LibusbInterface::operator(),liObj));  // Bind prevents copying obj (need to keep ptr)
+    thread2 = boost::thread(bind(&DataProcessor::operator(),dpObj));
 
     connected = true;
     cout << "    Connected to device, serial: " << chosen_serial << endl;
@@ -226,36 +224,15 @@ void cmd_leds()
 
 void cmd_start()
 {
-    cmd_start_with_file("");
+    CHECK_CONNECTED();
+    liObj->sendCommand(LibusbInterface::START);
 }
 
 void cmd_start_with_file(string output_file)
 {
     CHECK_CONNECTED();
 
-    /* Relies on us always using thread2.join() before dpObjs deletion */
-    if (thread2.joinable())
-    {
-        cout << "Already started!" << endl;
-        return;
-    }
-
-    if (output_file != "")
-    {
-        dpObj->openOutput(output_file);
-    }
-    else
-    {
-        dpObj->openOutput();
-    }
-
-    if (!dpObj->openedFile())
-    {
-        cout << "An output file is not open ";
-        cout << "so no results will be recorded" << endl;
-    }
-
-    thread2 = boost::thread(bind(&DataProcessor::operator(),dpObj));
+    dpObj->openOutput(output_file);
     liObj->sendCommand(LibusbInterface::START);
 }
 
@@ -263,11 +240,6 @@ void cmd_stop()
 {
     CHECK_CONNECTED();
 
-    dpObj->endSignal();
-    thread2.join();
-    dpObj->closeOutput();
-    delete dpObj;
-    dpObj = new DataProcessor(&bmutex, dQueue.get());
     liObj->sendCommand(LibusbInterface::STOP);
 }
 
