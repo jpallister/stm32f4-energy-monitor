@@ -17,3 +17,10 @@ libtool
 pyenergy.la
 *.lo
 stamp-h1
+Makefile
+Makefile.in
+config.h
+config.h.in
+aclocal.m4
+build-aux
+configure
