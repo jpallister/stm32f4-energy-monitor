@@ -212,6 +212,7 @@ int DataProcessor::closeOutput()
     int to_return = 0;
     if (output)
     {
+        fprintf(output,"\n");
         to_return = fclose(output);
         output = NULL;
     }

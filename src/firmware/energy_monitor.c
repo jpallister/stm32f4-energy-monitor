@@ -92,7 +92,7 @@ static const struct usb_config_descriptor config = {
     .interface = ifaces,
 };
 
-static const char serial_str[] __attribute__ ((section (".flash"))) = "MSEM0000";
+static const char serial_str[] __attribute__ ((section (".flash"))) = "EE00";
 
 static const char *usb_strings[] = {
     "James Pallister",
@@ -173,6 +173,8 @@ void start_measurement()
 void stop_measurement()
 {
     running = 0;
+    head_ptr = 0;
+    tail_ptr = 0;
     timer_disable_counter(TIM2);
     adc_off(ADC1);
     adc_off(ADC2);
@@ -188,9 +190,6 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
     (void)buf;
     (void)usbd_dev;
 
-    gpio_toggle(GPIOD, GPIO14);
-
-
     switch (req->bRequest) {
     case 0:    // toggle LEDS
         gpio_toggle(GPIOD, GPIO13);
@@ -198,12 +197,15 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
         break;
     case 1:     // Start
     {
+        gpio_set(GPIOD, GPIO12);
+
         start_measurement();
         *len = 0;
         break;
     }
     case 2:     // Stop
     {
+        gpio_clear(GPIOD, GPIO12);
         stop_measurement();
         *len = 0;
         break;
@@ -212,26 +214,30 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
     {
         uint32_t base_addr = (uint32_t) serial_str;
 
-        if(*len != 8)
+        if(*len != 0)
             return 0;
 
         flash_unlock();
-        flash_erase_sector(FLASH_CR_SECTOR_1, FLASH_CR_PROGRAM_X32);
-        for(i = 0; i < 8 ;++i)
-        {
-            flash_program_byte(base_addr+i, (*buf)[i]);
-        }
-        flash_program_byte(base_addr+8, 0x0);
+        flash_erase_sector(1, FLASH_CR_PROGRAM_X32);
+
+        flash_program_byte(base_addr+0, req->wValue & 0xFF);
+        flash_program_byte(base_addr+1, req->wValue >> 8);
+        flash_program_byte(base_addr+2, req->wIndex & 0xFF);
+        flash_program_byte(base_addr+3, req->wIndex >> 8);
+
+        flash_program_byte(base_addr+4, 0x0);
         flash_lock();
 
         break;
     }
     case 4:     // Set Trigger
     {
-        if(*len != 2)
+        if(*len != 0)
             return 0;
 
-        switch((*buf)[0])
+        gpio_toggle(GPIOD, GPIO14);
+
+        switch(req->wValue)
         {
             case 'A': trigger_port = GPIOA; break;
             case 'B': trigger_port = GPIOB; break;
@@ -245,7 +251,11 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
                 trigger_port = -1; break;
         }
 
-        trigger_pin = 1 << (*buf)[1];
+        trigger_pin = 1 << req->wIndex;
+
+        if(trigger_port != GPIOA)
+            gpio_toggle(GPIOD, GPIO12);
+
         exti_setup();
         break;
     }
@@ -528,11 +538,13 @@ usbd_device *usbd_dev;
 int send_int = 0;
 char interrupt_buf[4]= {0};
 
+uint8_t control_buffer[128] __attribute__((aligned (16)));
+
+
 int main(void)
 {
     int c_started=0, n, cpy;
     short s;
-    uint8_t control_buffer[128];
 
     rcc_clock_setup_hse_3v3(&hse_8mhz_3v3[CLOCK_3V3_168MHZ]);
 
@@ -600,7 +612,6 @@ void dma2_stream0_isr()
     if((DMA2_LISR & DMA_LISR_TCIF0) != 0)
     {
         dma_clear_interrupt_flags(DMA2, DMA_STREAM0, DMA_LISR_TCIF0);
-        gpio_toggle(GPIOD, GPIO14);
 
 
         nhead = (head_ptr+1);

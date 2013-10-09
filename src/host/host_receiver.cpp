@@ -122,9 +122,9 @@ void cmd_setserial(string new_serial)
 {
     CHECK_CONNECTED();
 
-    if(new_serial.length() != 8)
+    if(new_serial.length() != 4)
     {
-        cout << "Length of the serial string must be 8 characters" << endl;
+        cout << "Length of the serial string must be 4 characters" << endl;
         return;
     }
     cout << "    Setting serial to " << new_serial << endl;
@@ -257,6 +257,23 @@ void cmd_power_set(string power)
         dpObj->setAccumulation(true);
     else
         dpObj->setAccumulation(false);
+}
+
+bool cmd_is_running()
+{
+    if (!connected) { 
+        cout << "    Need to be connected" << endl; 
+        return false; 
+    }
+
+    if(liObj->isRunning())
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
 }
 
 void cmd_mode(string new_mode)

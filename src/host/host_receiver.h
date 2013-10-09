@@ -28,6 +28,7 @@ void cmd_mode(string new_mode);
 void cmd_help();
 
 void cmd_exit();
+bool cmd_is_running();
 
 void processCommand(string input);
 

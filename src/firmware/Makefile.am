@@ -8,4 +8,4 @@ AM_CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 
 #AM_LDFLAGS  = -mcpu=cortex-m4 -mthumb
 #AM_LDFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
-AM_LDFLAGS = -lopencm3_stm32f4
+AM_LDFLAGS = -lopencm3_stm32f4 -T libopencm3_stm32f4.ld

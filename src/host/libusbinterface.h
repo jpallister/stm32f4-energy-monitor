@@ -49,6 +49,8 @@ public:
     void setTrigger(char, int);
     void setMode(Mode);
 
+    bool isRunning();
+
 private:
     boost::mutex *mQueue;
     boost::mutex cQueueMutex;

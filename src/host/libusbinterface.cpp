@@ -406,15 +406,15 @@ bool LibusbInterface::sendMonitorCommand(CommandData cmd)
 
     if(cmd.cmd == SETSERIAL)
     {
-        unsigned char data[8] = {0};
+        unsigned char data[4] = {0};
         int len = cmd.cmd_data.length();
 
-        if(len > 8)
-            len = 8;
+        if(len > 4)
+            len = 4;
 
         memcpy(data, cmd.cmd_data.c_str(), len);
 
-        r = libusb_control_transfer(devh, 0x41, cmd.cmd, 0, 0, data, len, 3000);
+        r = libusb_control_transfer(devh, 0x41, cmd.cmd, data[0] | (data[1] << 8), data[2] | (data[3] << 8), NULL, 0, 3000);
     }
     else if(cmd.cmd == SETTRIGGER)
     {
@@ -423,7 +423,7 @@ bool LibusbInterface::sendMonitorCommand(CommandData cmd)
 
         memcpy(data, cmd.cmd_data.c_str(), 2);
 
-        r = libusb_control_transfer(devh, 0x41, cmd.cmd, 0, 0, data, len, 300);
+        r = libusb_control_transfer(devh, 0x41, cmd.cmd, data[0], data[1], NULL, 0, 300);
     }
     else if(cmd.cmd == SETMODE)
     {
@@ -463,4 +463,9 @@ bool LibusbInterface::sendMonitorCommand(CommandData cmd)
     }
 
     return true;
+}
+
+bool LibusbInterface::isRunning()
+{
+    return running;
 }

@@ -11,10 +11,13 @@ void mt_start_output()
 {
     int i;
 
-    cout << "\r";
-    for(i = 0; i < strlen(rl_line_buffer) + strlen(rl_prompt); ++i)
-        cout << " ";
-    cout << "\r";
+    if(rl_line_buffer && rl_prompt)
+    {
+        cout << "\r";
+        for(i = 0; i < strlen(rl_line_buffer) + strlen(rl_prompt); ++i)
+            cout << " ";
+        cout << "\r";
+    }
 }
 
 void mt_end_output()
