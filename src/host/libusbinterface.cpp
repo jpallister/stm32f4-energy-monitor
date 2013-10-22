@@ -434,6 +434,10 @@ bool LibusbInterface::sendMonitorCommand(CommandData cmd)
 
         r = libusb_control_transfer(devh, 0x41, cmd.cmd, 0, 0, data, len, 300);
     }
+    else if(cmd.cmd == GETENERGY)
+    {
+        r = libusb_control_transfer(devh, 0xc1, cmd.cmd, 0, 0, (unsigned char*)&lastEnergy, 8, 1000);
+    }
     else
     {
         r = libusb_control_transfer(devh, 0x41, cmd.cmd, 0, 0, NULL, 0, 100);
@@ -468,4 +472,11 @@ bool LibusbInterface::sendMonitorCommand(CommandData cmd)
 bool LibusbInterface::isRunning()
 {
     return running;
+}
+
+bool LibusbInterface::cmdsEmpty()
+{
+    boost::mutex::scoped_lock lock(cQueueMutex);
+
+    return cQueue.empty();
 }

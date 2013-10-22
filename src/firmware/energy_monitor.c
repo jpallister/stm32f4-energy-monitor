@@ -108,6 +108,14 @@ int head_ptr = 0, tail_ptr = 0;
 int trigger_port = -1, trigger_pin = -1;
 
 int adc_mode = REGULAR_ADC;
+int accumulate_onboard=1;
+uint64_t energy_accum=123;
+unsigned n_samples=0;
+
+#define TPERIOD_INIT    1600
+
+int tperiod=TPERIOD_INIT;
+
 
 void exti_setup()
 {
@@ -156,6 +164,14 @@ void start_measurement()
     running = 1;
     head_ptr = 0;
     tail_ptr = 0;
+    energy_accum = 0;
+    n_samples = 0;
+
+    if(accumulate_onboard)
+        tperiod = 800;
+    else
+        tperiod=TPERIOD_INIT;
+    timer_set_period(TIM2, tperiod>>2);
     timer_enable_counter(TIM2);
 
     adc_power_on(ADC1);
@@ -272,6 +288,12 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
         adc_setup();
         break;
     }
+    case 6:     // Get energy
+    {
+        *len = 8;
+        *buf = &energy_accum;
+        break;
+    }
     default:
         return 0;
     }
@@ -357,9 +379,6 @@ unsigned short dbuf0[OVERSAMPLED_ADC_SHORTS];
 int sent_counter=0;
 
 
-#define TPERIOD_INIT    1600
-
-int tperiod=TPERIOD_INIT;
 
 void dma_setup()
 {
@@ -588,15 +607,18 @@ int main(void)
         if(head_ptr == tail_ptr)
             continue;
 
-        if(usbd_ep_write_packet(usbd_dev, 0x81, data_bufs[tail_ptr].data, DATA_BUF_BYTES) != 0)
+        if(!accumulate_onboard)
         {
-            gpio_toggle(GPIOD, GPIO15);
+            if(usbd_ep_write_packet(usbd_dev, 0x81, data_bufs[tail_ptr].data, DATA_BUF_BYTES) != 0)
+            {
+                gpio_toggle(GPIOD, GPIO15);
 
-            tail_ptr = (tail_ptr+1);
-            if(tail_ptr >= NUM_BUFFERS)
-                tail_ptr = 0;
-            if(sent_counter < NUM_BUFFERS*2)
-                sent_counter++;
+                tail_ptr = (tail_ptr+1);
+                if(tail_ptr >= NUM_BUFFERS)
+                    tail_ptr = 0;
+                if(sent_counter < NUM_BUFFERS*2)
+                    sent_counter++;
+            }
         }
 
     }
@@ -613,22 +635,24 @@ void dma2_stream0_isr()
     {
         dma_clear_interrupt_flags(DMA2, DMA_STREAM0, DMA_LISR_TCIF0);
 
-
-        nhead = (head_ptr+1);
-        if(nhead >= NUM_BUFFERS)
-            nhead -= NUM_BUFFERS;
-        if(nhead == tail_ptr)
+        if(!accumulate_onboard)
         {
-            // If this happens: bad.
-            // The mostly happens when the host application exits uncleanly
-            // and the device is still capturing
-            head_ptr = tail_ptr = 0;
-            stop_measurement();
-            return;
+            nhead = (head_ptr+1);
+            if(nhead >= NUM_BUFFERS)
+                nhead -= NUM_BUFFERS;
+            if(nhead == tail_ptr)
+            {
+                // If this happens: bad.
+                // The mostly happens when the host application exits uncleanly
+                // and the device is still capturing
+                head_ptr = tail_ptr = 0;
+                stop_measurement();
+                return;
+            }
+            head_ptr = nhead;
         }
 
 
-        head_ptr = nhead;
 
         data_bufs[head_ptr].data[0] = tperiod>>3;
         if(adc_mode == REGULAR_ADC)
@@ -683,41 +707,54 @@ void dma2_stream0_isr()
 
             for(i = 0, dptr = 1; i < OVERSAMPLED_ADC_SHORTS; i += OVERSAMPLED_RATIO*2*2)
             {
-                unsigned short c_tot=0, v_tot=0;
+                unsigned c_tot=0, v_tot=0;
 
-                for(j = i; j < i+OVERSAMPLED_RATIO*2; j += 2)
+                if(accumulate_onboard)
                 {
-                    c_tot += dbuf0[j];
-                    v_tot += dbuf0[j+1];
+                    for(j = i; j < i+OVERSAMPLED_RATIO*2*2; j += 2)
+                    {
+                        // c_tot += dbuf0[j];
+                        // v_tot += dbuf0[j+1];
+                        energy_accum +=  dbuf0[j]*dbuf0[j+1];
+                        n_samples += 1;
+                    }
                 }
-                c_tot = c_tot >> OVERSAMPLED_BITS;
-                v_tot = v_tot >> OVERSAMPLED_BITS;
-
-                b0 = (c_tot * v_tot) >> 12;
-
-                c_tot=0;
-                v_tot=0;
-
-                for(; j < i+OVERSAMPLED_RATIO*2*2; j += 2)
+                else
                 {
-                    c_tot += dbuf0[j];
-                    v_tot += dbuf0[j+1];
+                    for(j = i; j < i+OVERSAMPLED_RATIO*2; j += 2)
+                    {
+                        c_tot += dbuf0[j];
+                        v_tot += dbuf0[j+1];
+                    }
+                    c_tot = c_tot >> OVERSAMPLED_BITS;
+                    v_tot = v_tot >> OVERSAMPLED_BITS;
+
+                    b0 = (c_tot * v_tot) >> 12;
+
+                    c_tot=0;
+                    v_tot=0;
+
+                    for(; j < i+OVERSAMPLED_RATIO*2*2; j += 2)
+                    {
+                        c_tot += dbuf0[j];
+                        v_tot += dbuf0[j+1];
+                    }
+                    c_tot = c_tot >> OVERSAMPLED_BITS;
+                    v_tot = v_tot >> OVERSAMPLED_BITS;
+
+                    b1 = (c_tot * v_tot) >> 12;
+
+                    data_bufs[head_ptr].data[dptr] = b0&0xFF;
+                    dptr++;
+                    data_bufs[head_ptr].data[dptr] = b1&0xFF;
+                    dptr++;
+                    data_bufs[head_ptr].data[dptr] = (b0>>8) | ((b1>>4)&0xF0);
+                    dptr++;
                 }
-                c_tot = c_tot >> OVERSAMPLED_BITS;
-                v_tot = v_tot >> OVERSAMPLED_BITS;
-
-                b1 = (c_tot * v_tot) >> 12;
-
-                data_bufs[head_ptr].data[dptr] = b0&0xFF;
-                dptr++;
-                data_bufs[head_ptr].data[dptr] = b1&0xFF;
-                dptr++;
-                data_bufs[head_ptr].data[dptr] = (b0>>8) | ((b1>>4)&0xF0);
-                dptr++;
             }
         }
 
-        if(running)
+        if(running && !accumulate_onboard)
         {
             // dif is number of full buffers
             int dif = (head_ptr+NUM_BUFFERS-tail_ptr);

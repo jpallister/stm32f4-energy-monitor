@@ -39,6 +39,12 @@ bool is_running_wrap()
     return cmd_is_running();
 }
 
+unsigned long long cmd_getenergy_wrap()
+{
+    ReleaseGIL rg;
+    return cmd_getenergy();
+}
+
 // TODO: Wrap other functions with ReleaseGIL (not sure if necessary)
 
 BOOST_PYTHON_MODULE(pyenergy)
@@ -72,4 +78,5 @@ BOOST_PYTHON_MODULE(pyenergy)
     def("exit", cmd_exit);
     def("quit", cmd_exit);
     def("is_running",is_running_wrap);
+    def("getenergy", cmd_getenergy_wrap);
 }

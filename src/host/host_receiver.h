@@ -25,6 +25,8 @@ void cmd_power_set(string power);
 
 void cmd_mode(string new_mode);
 
+unsigned long long cmd_getenergy();
+
 void cmd_help();
 
 void cmd_exit();

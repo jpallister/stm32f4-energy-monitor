@@ -35,7 +35,8 @@ public:
         STOP = 2,
         SETSERIAL = 3,
         SETTRIGGER = 4,
-        SETMODE = 5
+        SETMODE = 5,
+        GETENERGY = 6
     };
 
     enum Mode {
@@ -50,6 +51,9 @@ public:
     void setMode(Mode);
 
     bool isRunning();
+    unsigned long long lastEnergy;
+
+    bool cmdsEmpty();
 
 private:
     boost::mutex *mQueue;

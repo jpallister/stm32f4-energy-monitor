@@ -118,6 +118,18 @@ void cmd_getserial()
     cout << "    Connected device, serial: " << chosen_serial << endl;
 }
 
+unsigned long long cmd_getenergy()
+{
+    if (!connected) {
+        cout << "    Need to be connected" << endl;
+        return 0;
+    }
+
+    liObj->sendCommand(LibusbInterface::GETENERGY);
+    while(!liObj->cmdsEmpty());
+    return liObj->lastEnergy;
+}
+
 void cmd_setserial(string new_serial)
 {
     CHECK_CONNECTED();
@@ -431,6 +443,10 @@ void processCommand(string input)
     else if(args[0] == "exit" || args[0] == "quit")
     {
         cmd_exit();
+    }
+    else if(args[0] == "getenergy")
+    {
+        cmd_getenergy();
     }
     else
     {
