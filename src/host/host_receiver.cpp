@@ -68,20 +68,18 @@ void cmd_connect_to(string connect_to)
 
     if(devlist.size() > 1)
     {
-        if(connect_to.compare(""))
+        if(connect_to.compare("") == 0)
         {
             cout << "    Select a device" << endl;
             for(auto dev : devlist)
             {
-                i++;
-                cout << "        " << i << ": " << dev.first << "\t" << dev.second << endl;
+                cout << "        " << dev.first << "\t" << dev.second << endl;
             }
             return;
         }
         else
         {
-            int devn = lexical_cast<int>(connect_to);
-            chosen_serial = devlist[devn].first;
+            chosen_serial = connect_to;
         }
     }
     else
@@ -118,16 +116,17 @@ void cmd_getserial()
     cout << "    Connected device, serial: " << chosen_serial << endl;
 }
 
-unsigned long long cmd_getenergy()
+LibusbInterface::accumulated_data cmd_getenergy()
 {
     if (!connected) {
         cout << "    Need to be connected" << endl;
-        return 0;
+        return LibusbInterface::accumulated_data();
     }
 
     liObj->sendCommand(LibusbInterface::GETENERGY);
     while(!liObj->cmdsEmpty());
-    return liObj->lastEnergy;
+    printf("%lu %lu %u %u %u %u\n", liObj->lastData.energy_accum, liObj->lastData.elapsed_time, liObj->lastData.peak_power, liObj->lastData.peak_voltage, liObj->lastData.peak_current, liObj->lastData.n_samples);
+    return liObj->lastData;
 }
 
 void cmd_setserial(string new_serial)
@@ -273,9 +272,9 @@ void cmd_power_set(string power)
 
 bool cmd_is_running()
 {
-    if (!connected) { 
-        cout << "    Need to be connected" << endl; 
-        return false; 
+    if (!connected) {
+        cout << "    Need to be connected" << endl;
+        return false;
     }
 
     if(liObj->isRunning())

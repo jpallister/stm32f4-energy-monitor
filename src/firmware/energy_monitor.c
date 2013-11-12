@@ -109,7 +109,19 @@ int trigger_port = -1, trigger_pin = -1;
 
 int adc_mode = REGULAR_ADC;
 int accumulate_onboard=1;
-uint64_t energy_accum=123;
+
+typedef struct {
+    uint64_t energy_accum;
+    uint64_t elapsed_time;
+    unsigned peak_power;
+    unsigned peak_voltage;
+    unsigned peak_current;
+    unsigned n_samples;
+} accumulated_data;
+//uint64_t energy_accum=123;
+
+accumulated_data a_data;
+
 unsigned n_samples=0;
 
 #define TPERIOD_INIT    1600
@@ -164,8 +176,13 @@ void start_measurement()
     running = 1;
     head_ptr = 0;
     tail_ptr = 0;
-    energy_accum = 0;
     n_samples = 0;
+
+    a_data.energy_accum = 0;
+    a_data.elapsed_time = 0;
+    a_data.peak_power = 0;
+    a_data.peak_voltage = 0;
+    a_data.peak_current = 0;
 
     if(accumulate_onboard)
         tperiod = 800;
@@ -184,6 +201,7 @@ void start_measurement()
        adc_power_on(ADC2);
        adc_power_on(ADC3);
     }
+        gpio_set(GPIOD, GPIO12);
 }
 
 void stop_measurement()
@@ -195,6 +213,7 @@ void stop_measurement()
     adc_off(ADC1);
     adc_off(ADC2);
     adc_off(ADC3);
+        gpio_clear(GPIOD, GPIO12);
 }
 
 static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *req, uint8_t **buf,
@@ -290,8 +309,8 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
     }
     case 6:     // Get energy
     {
-        *len = 8;
-        *buf = &energy_accum;
+        *len = sizeof(accumulated_data);
+        *buf = &a_data;
         break;
     }
     default:
@@ -356,7 +375,7 @@ static void usbdev_set_config(usbd_device *usbd_dev, uint16_t wValue)
 
 #define DATA_BUF_BYTES      64
 #define DATA_BUF_SHORTS     42
-#define NUM_BUFFERS         2000
+#define NUM_BUFFERS         1000
 #define NUM_BUFFERS_MASK    (NUM_BUFFERS-1)
 
 #define HIGH_THRESH         64
@@ -715,9 +734,19 @@ void dma2_stream0_isr()
                     {
                         // c_tot += dbuf0[j];
                         // v_tot += dbuf0[j+1];
-                        energy_accum +=  dbuf0[j]*dbuf0[j+1];
-                        n_samples += 1;
+                        // energy_accum +=  dbuf0[j]*dbuf0[j+1];
+                        a_data.energy_accum += dbuf0[j]*dbuf0[j+1];
+                        if(dbuf0[j]*dbuf0[j+1] > a_data.peak_power)
+                            a_data.peak_power = dbuf0[j]*dbuf0[j+1];
+                        if(dbuf0[j] > a_data.peak_current)
+                            a_data.peak_current = dbuf0[j];
+                        if(dbuf0[j+1] > a_data.peak_voltage)
+                            a_data.peak_voltage = dbuf0[j+1];
+                        // a_data.elapsed_time += (tperiod >> 2);
+
+                        a_data.n_samples += 1;
                     }
+                    a_data.elapsed_time += tperiod;
                 }
                 else
                 {
@@ -792,11 +821,11 @@ void exti_isr()
 {
     exti_reset_request(trigger_pin);
 
-    gpio_toggle(GPIOD, GPIO13);
+//    gpio_toggle(GPIOD, GPIO13);
 
-    if(status == -1)
+    if(status == -1 || 1 )
     {
-        gpio_toggle(GPIOD, GPIO12);
+  //      gpio_toggle(GPIOD, GPIO12);
         send_int = 1;
 
         if (gpio_get(trigger_port, trigger_pin))

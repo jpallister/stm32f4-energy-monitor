@@ -35,7 +35,7 @@ std::vector<std::pair<std::string, std::string> > LibusbInterface::listDevices(u
     ssize_t cnt;
     vector<pair<string,string> > devlist;
 
-    libusb_set_debug(NULL,3);
+//    libusb_set_debug(NULL,3);
 
     cnt = libusb_get_device_list(NULL, &devs);
     if (cnt < 0)
@@ -257,7 +257,7 @@ void LIBUSB_CALL LibusbInterface::transfer_callback(struct libusb_transfer *tran
 
     if(transfer->status == LIBUSB_TRANSFER_TIMED_OUT)
     {
-        printf("Transfer timeout, rescheduling\n");
+     //   printf("Transfer timeout, rescheduling\n");
 
         if((r=libusb_submit_transfer(transfer)) < 0)
         {
@@ -436,7 +436,7 @@ bool LibusbInterface::sendMonitorCommand(CommandData cmd)
     }
     else if(cmd.cmd == GETENERGY)
     {
-        r = libusb_control_transfer(devh, 0xc1, cmd.cmd, 0, 0, (unsigned char*)&lastEnergy, 8, 1000);
+        r = libusb_control_transfer(devh, 0xc1, cmd.cmd, 0, 0, (unsigned char*)&lastData, sizeof(accumulated_data), 1000);
     }
     else
     {

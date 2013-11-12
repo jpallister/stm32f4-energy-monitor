@@ -51,7 +51,16 @@ public:
     void setMode(Mode);
 
     bool isRunning();
-    unsigned long long lastEnergy;
+
+    struct accumulated_data {
+        uint64_t energy_accum;
+        uint64_t elapsed_time;
+        unsigned peak_power;
+        unsigned peak_voltage;
+        unsigned peak_current;
+        unsigned n_samples;
+    };
+    accumulated_data lastData;
 
     bool cmdsEmpty();
 

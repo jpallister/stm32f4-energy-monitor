@@ -39,7 +39,7 @@ bool is_running_wrap()
     return cmd_is_running();
 }
 
-unsigned long long cmd_getenergy_wrap()
+LibusbInterface::accumulated_data cmd_getenergy_wrap()
 {
     ReleaseGIL rg;
     return cmd_getenergy();
@@ -79,4 +79,12 @@ BOOST_PYTHON_MODULE(pyenergy)
     def("quit", cmd_exit);
     def("is_running",is_running_wrap);
     def("getenergy", cmd_getenergy_wrap);
+
+    class_<LibusbInterface::accumulated_data>("accumulated_data")
+        .def_readwrite("energy_accum", &LibusbInterface::accumulated_data::energy_accum)
+        .def_readwrite("elapsed_time", &LibusbInterface::accumulated_data::elapsed_time)
+        .def_readwrite("peak_power", &LibusbInterface::accumulated_data::peak_power)
+        .def_readwrite("peak_voltage", &LibusbInterface::accumulated_data::peak_voltage)
+        .def_readwrite("peak_current", &LibusbInterface::accumulated_data::peak_current)
+        .def_readwrite("n_samples", &LibusbInterface::accumulated_data::n_samples);
 }
