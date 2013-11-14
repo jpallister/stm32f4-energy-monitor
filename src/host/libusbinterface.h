@@ -52,6 +52,13 @@ public:
 
     bool isRunning();
 
+    /*  Energy in joules:
+         =  Vref^2 / gain / resistor / 4096^2
+               * tperiod * (2/168000000) * energy_accum
+                             ^ peripheral clk rate (timer cnt)
+        Elapsed time in seconds:
+         = elapsed_time * (2/168000000)
+    */
     struct accumulated_data {
         uint64_t energy_accum;
         uint64_t elapsed_time;
