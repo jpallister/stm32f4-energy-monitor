@@ -56,8 +56,18 @@ public:
          =  Vref^2 / gain / resistor / 4096^2
                * tperiod * (2/168000000) * energy_accum
                              ^ peripheral clk rate (timer cnt)
+
         Elapsed time in seconds:
          = elapsed_time * (2/168000000)
+
+        Peak power in watts
+         = Vref^2 / gain / resistor / 4096^2 * peak_power
+
+        Peak voltage in volts
+          = peak_voltage / 4096 * Vref
+
+        Peak current in amps
+          = peak_current / 4096 * Vref
     */
     struct accumulated_data {
         uint64_t energy_accum;
