@@ -64,10 +64,10 @@ public:
          = Vref^2 / gain / resistor / 4096^2 * peak_power
 
         Peak voltage in volts
-          = peak_voltage / 4096 * Vref
+          = peak_voltage / 4096 * Vref * 2
 
         Peak current in amps
-          = peak_current / 4096 * Vref
+          = peak_current / 4096 * Vref / gain / resistor
     */
     struct accumulated_data {
         uint64_t energy_accum;
