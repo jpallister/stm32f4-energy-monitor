@@ -753,9 +753,16 @@ void dma2_stream0_isr()
                         a_data.n_samples += 1;
                     }
                     a_data.elapsed_time += tperiod;
-                    a_data.peak_power = pp_tot / OVERSAMPLED_RATIO/2;
-                    a_data.peak_voltage = pv_tot / OVERSAMPLED_RATIO/2;
-                    a_data.peak_current = pi_tot / OVERSAMPLED_RATIO/2;
+                    pp_tot /= OVERSAMPLED_RATIO/2;
+                    pv_tot /= OVERSAMPLED_RATIO/2;
+                    pi_tot /= OVERSAMPLED_RATIO/2;
+
+                    if(pp_tot > a_data.peak_power)
+                        a_data.peak_power = pp_tot;
+                    if(pv_tot > a_data.peak_voltage)
+                        a_data.peak_voltage = pv_tot;
+                    if(pi_tot > a_data.peak_current)
+                        a_data.peak_current = pi_tot;
                 }
                 else
                 {

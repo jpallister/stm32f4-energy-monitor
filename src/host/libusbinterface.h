@@ -53,7 +53,7 @@ public:
     bool isRunning();
 
     /*  Energy in joules:
-         =  Vref^2 / gain / resistor / 4096^2
+         =  Vref^2 / gain / resistor / 4096^2 * 2
                * tperiod * (2/168000000) * energy_accum
                              ^ peripheral clk rate (timer cnt)
 
@@ -61,7 +61,7 @@ public:
          = elapsed_time * (2/168000000)
 
         Peak power in watts
-         = Vref^2 / gain / resistor / 4096^2 * peak_power
+         = Vref^2 / gain / resistor / 4096^2 * peak_power * 2
 
         Peak voltage in volts
           = peak_voltage / 4096 * Vref * 2
