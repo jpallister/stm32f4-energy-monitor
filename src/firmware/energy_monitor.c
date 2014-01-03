@@ -453,7 +453,9 @@ void timer_setup()
 
 void adc_setup()
 {
-    gpio_mode_setup(GPIOA, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO1 | GPIO2);
+    gpio_mode_setup(GPIOA, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO1 | GPIO2 | GPIO3);
+    gpio_mode_setup(GPIOB, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO0 | GPIO1);
+    gpio_mode_setup(GPIOC, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO2 | GPIO4 | GPIO5);
     rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_ADC1EN);
     rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_ADC2EN);
     rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_ADC3EN);
@@ -483,8 +485,18 @@ void adc_setup()
     }
     else if(adc_mode == DUAL_ADC || adc_mode == OVERSAMPLED_ADC)
     {
-        uint8_t channels1[] = {ADC_CHANNEL1};
-        uint8_t channels2[] = {ADC_CHANNEL2};
+        // Input 1
+        // uint8_t channels1[] = {ADC_CHANNEL2};   // Voltage, PA2, ADC123
+        // uint8_t channels2[] = {ADC_CHANNEL12};  // Current, PC2, ADC123
+        // Input 2
+        // uint8_t channels1[] = {ADC_CHANNEL3};   // Voltage, PA3, ADC123
+        // uint8_t channels2[] = {ADC_CHANNEL1};   // Current, PA1, ADC123
+        // Input 3
+        // uint8_t channels1[] = {ADC_CHANNEL9};   // Voltage, PB1, ADC12
+        // uint8_t channels2[] = {ADC_CHANNEL15};  // Current, PC5, ADC12
+        // Input self
+        uint8_t channels1[] = {ADC_CHANNEL8};   // Voltage, PB0, ADC12
+        uint8_t channels2[] = {ADC_CHANNEL14};  // Current, PC4, ADC12
         adc_set_regular_sequence(ADC1, 1, channels1);
         adc_set_regular_sequence(ADC2, 1, channels2);
 
@@ -727,26 +739,23 @@ void dma2_stream0_isr()
             for(i = 0, dptr = 1; i < OVERSAMPLED_ADC_SHORTS; i += OVERSAMPLED_RATIO*2*2)
             {
                 unsigned c_tot=0, v_tot=0;
+                unsigned pp_tot = 0, pv_tot = 0, pi_tot=0;
 
                 if(accumulate_onboard)
                 {
                     for(j = i; j < i+OVERSAMPLED_RATIO*2*2; j += 2)
                     {
-                        // c_tot += dbuf0[j];
-                        // v_tot += dbuf0[j+1];
-                        // energy_accum +=  dbuf0[j]*dbuf0[j+1];
                         a_data.energy_accum += dbuf0[j]*dbuf0[j+1];
-                        if(dbuf0[j]*dbuf0[j+1] > a_data.peak_power)
-                            a_data.peak_power = dbuf0[j]*dbuf0[j+1];
-                        if(dbuf0[j] > a_data.peak_current)
-                            a_data.peak_current = dbuf0[j];
-                        if(dbuf0[j+1] > a_data.peak_voltage)
-                            a_data.peak_voltage = dbuf0[j+1];
-                        // a_data.elapsed_time += (tperiod >> 2);
+                        pp_tot += dbuf0[j]*dbuf0[j+1];
+                        pi_tot += dbuf0[j];
+                        pv_tot += dbuf0[j+1];
 
                         a_data.n_samples += 1;
                     }
                     a_data.elapsed_time += tperiod;
+                    a_data.peak_power = pp_tot / OVERSAMPLED_RATIO/2;
+                    a_data.peak_voltage = pv_tot / OVERSAMPLED_RATIO/2;
+                    a_data.peak_current = pi_tot / OVERSAMPLED_RATIO/2;
                 }
                 else
                 {
