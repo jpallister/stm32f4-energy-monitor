@@ -486,8 +486,8 @@ void adc_setup()
     else if(adc_mode == DUAL_ADC || adc_mode == OVERSAMPLED_ADC)
     {
         // Input 1
-        // uint8_t channels1[] = {ADC_CHANNEL2};   // Voltage, PA2, ADC123
-        // uint8_t channels2[] = {ADC_CHANNEL12};  // Current, PC2, ADC123
+        uint8_t channels1[] = {ADC_CHANNEL2};   // Voltage, PA2, ADC123
+        uint8_t channels2[] = {ADC_CHANNEL12};  // Current, PC2, ADC123
         // Input 2
         // uint8_t channels1[] = {ADC_CHANNEL3};   // Voltage, PA3, ADC123
         // uint8_t channels2[] = {ADC_CHANNEL1};   // Current, PA1, ADC123
@@ -495,8 +495,8 @@ void adc_setup()
         // uint8_t channels1[] = {ADC_CHANNEL9};   // Voltage, PB1, ADC12
         // uint8_t channels2[] = {ADC_CHANNEL15};  // Current, PC5, ADC12
         // Input self
-        uint8_t channels1[] = {ADC_CHANNEL8};   // Voltage, PB0, ADC12
-        uint8_t channels2[] = {ADC_CHANNEL14};  // Current, PC4, ADC12
+        // uint8_t channels1[] = {ADC_CHANNEL8};   // Voltage, PB0, ADC12
+        // uint8_t channels2[] = {ADC_CHANNEL14};  // Current, PC4, ADC12
         adc_set_regular_sequence(ADC1, 1, channels1);
         adc_set_regular_sequence(ADC2, 1, channels2);
 
