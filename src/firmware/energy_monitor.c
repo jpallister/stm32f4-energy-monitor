@@ -486,8 +486,8 @@ void adc_setup()
     else if(adc_mode == DUAL_ADC || adc_mode == OVERSAMPLED_ADC)
     {
         // Input 1
-        // uint8_t channels1[] = {ADC_CHANNEL2};   // Voltage, PA2, ADC123
-        // uint8_t channels2[] = {ADC_CHANNEL12};  // Current, PC2, ADC123
+        uint8_t channels1[] = {ADC_CHANNEL2};   // Voltage, PA2, ADC123
+        uint8_t channels2[] = {ADC_CHANNEL12};  // Current, PC2, ADC123
         // Input 2
         // uint8_t channels1[] = {ADC_CHANNEL3};   // Voltage, PA3, ADC123
         // uint8_t channels2[] = {ADC_CHANNEL1};   // Current, PA1, ADC123
@@ -495,8 +495,8 @@ void adc_setup()
         // uint8_t channels1[] = {ADC_CHANNEL9};   // Voltage, PB1, ADC12
         // uint8_t channels2[] = {ADC_CHANNEL15};  // Current, PC5, ADC12
         // Input self
-        uint8_t channels1[] = {ADC_CHANNEL8};   // Voltage, PB0, ADC12
-        uint8_t channels2[] = {ADC_CHANNEL14};  // Current, PC4, ADC12
+        // uint8_t channels1[] = {ADC_CHANNEL8};   // Voltage, PB0, ADC12
+        // uint8_t channels2[] = {ADC_CHANNEL14};  // Current, PC4, ADC12
         adc_set_regular_sequence(ADC1, 1, channels1);
         adc_set_regular_sequence(ADC2, 1, channels2);
 
@@ -753,9 +753,16 @@ void dma2_stream0_isr()
                         a_data.n_samples += 1;
                     }
                     a_data.elapsed_time += tperiod;
-                    a_data.peak_power = pp_tot / OVERSAMPLED_RATIO/2;
-                    a_data.peak_voltage = pv_tot / OVERSAMPLED_RATIO/2;
-                    a_data.peak_current = pi_tot / OVERSAMPLED_RATIO/2;
+                    pp_tot /= OVERSAMPLED_RATIO/2;
+                    pv_tot /= OVERSAMPLED_RATIO/2;
+                    pi_tot /= OVERSAMPLED_RATIO/2;
+
+                    if(pp_tot > a_data.peak_power)
+                        a_data.peak_power = pp_tot;
+                    if(pv_tot > a_data.peak_voltage)
+                        a_data.peak_voltage = pv_tot;
+                    if(pi_tot > a_data.peak_current)
+                        a_data.peak_current = pi_tot;
                 }
                 else
                 {
