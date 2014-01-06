@@ -12,11 +12,6 @@
 #include <libopencm3/stm32/exti.h>
 #include <libopencm3/stm32/pwr.h>
 
-#define REGULAR_ADC     0
-#define DUAL_ADC        1
-#define OVERSAMPLED_ADC 2
-#define INTERLEAVED_ADC 3
-
 // USB Code
 
 static const struct usb_device_descriptor dev = {
@@ -107,9 +102,6 @@ int running = 0;
 int head_ptr = 0, tail_ptr = 0;
 int trigger_port = -1, trigger_pin = -1;
 
-int adc_mode = REGULAR_ADC;
-int accumulate_onboard=1;
-
 typedef struct {
     uint64_t energy_accum;
     uint64_t elapsed_time;
@@ -184,24 +176,15 @@ void start_measurement()
     a_data.peak_voltage = 0;
     a_data.peak_current = 0;
 
-    if(accumulate_onboard)
-        tperiod = 800;
-    else
-        tperiod=TPERIOD_INIT;
+    tperiod = 800;
+
     timer_set_period(TIM2, tperiod>>2);
     timer_enable_counter(TIM2);
 
     adc_power_on(ADC1);
-    if(adc_mode == DUAL_ADC)
-    {
-       adc_power_on(ADC2);
-    }
-    else if(adc_mode == OVERSAMPLED_ADC)
-    {
-       adc_power_on(ADC2);
-       adc_power_on(ADC3);
-    }
-        gpio_set(GPIOD, GPIO12);
+    adc_power_on(ADC2);
+    // adc_power_on(ADC3);
+    gpio_set(GPIOD, GPIO12);
 }
 
 void stop_measurement()
@@ -212,7 +195,7 @@ void stop_measurement()
     timer_disable_counter(TIM2);
     adc_off(ADC1);
     adc_off(ADC2);
-    adc_off(ADC3);
+    // adc_off(ADC3);
         gpio_clear(GPIOD, GPIO12);
 }
 
@@ -292,19 +275,6 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
             gpio_toggle(GPIOD, GPIO12);
 
         exti_setup();
-        break;
-    }
-    case 5:     // Set mode
-    {
-        if(*len != 1)
-            return 0;
-
-        adc_mode = (*buf)[0];
-        if(adc_mode != REGULAR_ADC && adc_mode != DUAL_ADC && OVERSAMPLED_ADC)
-            adc_mode = 0;
-
-        dma_setup();
-        adc_setup();
         break;
     }
     case 6:     // Get energy
@@ -394,7 +364,7 @@ typedef struct {
 
 power_data data_bufs[NUM_BUFFERS] = {0};
 
-unsigned short dbuf0[OVERSAMPLED_ADC_SHORTS];
+unsigned short dbuf0[OVERSAMPLED_ADC_SHORTS] __attribute__ ((aligned (8)));
 int sent_counter=0;
 
 
@@ -403,21 +373,8 @@ void dma_setup()
 {
     dma_stream_reset(DMA2, DMA_STREAM0);
 
-    if(adc_mode == REGULAR_ADC)
-    {
-        dma_set_peripheral_address(DMA2, DMA_STREAM0, (uint32_t)&ADC1_DR);
-        dma_set_number_of_data(DMA2, DMA_STREAM0, REGULAR_ADC_SHORTS);
-    }
-    else if(adc_mode == OVERSAMPLED_ADC)
-    {
-        dma_set_peripheral_address(DMA2, DMA_STREAM0, (uint32_t)&ADC_CDR);
-        dma_set_number_of_data(DMA2, DMA_STREAM0, OVERSAMPLED_ADC_SHORTS);
-    }
-    else
-    {
-        dma_set_peripheral_address(DMA2, DMA_STREAM0, (uint32_t)&ADC_CDR);
-        dma_set_number_of_data(DMA2, DMA_STREAM0, DUAL_ADC_SHORTS);
-    }
+    dma_set_peripheral_address(DMA2, DMA_STREAM0, (uint32_t)&ADC_CDR);
+    dma_set_number_of_data(DMA2, DMA_STREAM0, OVERSAMPLED_ADC_SHORTS);
 
     dma_set_memory_address(DMA2, DMA_STREAM0, (uint32_t)&dbuf0);
     dma_set_transfer_mode(DMA2, DMA_STREAM0, DMA_SxCR_DIR_PERIPHERAL_TO_MEM);
@@ -467,69 +424,29 @@ void adc_setup()
     adc_set_single_conversion_mode(ADC2);
 	adc_set_single_conversion_mode(ADC3);
 
-    if(adc_mode == REGULAR_ADC)
-    {
-        uint8_t channels[] = {ADC_CHANNEL2, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1,
-            ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1,
-            ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1, ADC_CHANNEL1};
-        adc_set_regular_sequence(ADC1, 15, channels);
-        adc_enable_scan_mode(ADC1);
-        adc_enable_discontinuous_mode_regular(ADC1, ADC_CR1_DISCNUM_1CHANNELS);
-        ADC_CCR &= ~(ADC_CCR_DMA_MASK | ADC_CCR_DDS);
-        ADC_CCR |= ADC_CCR_DMA_MODE_1;
-        adc_set_multi_mode(ADC_CCR_MULTI_INDEPENDENT);
+    // Input 1
+    uint8_t channels1[] = {ADC_CHANNEL2};   // Voltage, PA2, ADC123
+    uint8_t channels2[] = {ADC_CHANNEL12};  // Current, PC2, ADC123
+    // Input 2
+    // uint8_t channels1[] = {ADC_CHANNEL3};   // Voltage, PA3, ADC123
+    // uint8_t channels2[] = {ADC_CHANNEL1};   // Current, PA1, ADC123
+    // Input 3
+    // uint8_t channels1[] = {ADC_CHANNEL9};   // Voltage, PB1, ADC12
+    // uint8_t channels2[] = {ADC_CHANNEL15};  // Current, PC5, ADC12
+    // Input self
+    // uint8_t channels1[] = {ADC_CHANNEL8};   // Voltage, PB0, ADC12
+    // uint8_t channels2[] = {ADC_CHANNEL14};  // Current, PC4, ADC12
+    adc_set_regular_sequence(ADC1, 1, channels1);
+    adc_set_regular_sequence(ADC2, 1, channels2);
 
-        adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR_SMP_3CYC);
-        adc_set_sample_time(ADC1, ADC_CHANNEL2, ADC_SMPR_SMP_3CYC);
-        adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
-    }
-    else if(adc_mode == DUAL_ADC || adc_mode == OVERSAMPLED_ADC)
-    {
-        // Input 1
-        uint8_t channels1[] = {ADC_CHANNEL2};   // Voltage, PA2, ADC123
-        uint8_t channels2[] = {ADC_CHANNEL12};  // Current, PC2, ADC123
-        // Input 2
-        // uint8_t channels1[] = {ADC_CHANNEL3};   // Voltage, PA3, ADC123
-        // uint8_t channels2[] = {ADC_CHANNEL1};   // Current, PA1, ADC123
-        // Input 3
-        // uint8_t channels1[] = {ADC_CHANNEL9};   // Voltage, PB1, ADC12
-        // uint8_t channels2[] = {ADC_CHANNEL15};  // Current, PC5, ADC12
-        // Input self
-        // uint8_t channels1[] = {ADC_CHANNEL8};   // Voltage, PB0, ADC12
-        // uint8_t channels2[] = {ADC_CHANNEL14};  // Current, PC4, ADC12
-        adc_set_regular_sequence(ADC1, 1, channels1);
-        adc_set_regular_sequence(ADC2, 1, channels2);
+    adc_disable_external_trigger_regular(ADC2);
+    ADC_CCR &= ~(ADC_CCR_DMA_MASK | ADC_CCR_DDS);
+    ADC_CCR |= ADC_CCR_DMA_MODE_1 | ADC_CCR_DDS;
+    adc_set_multi_mode(ADC_CCR_MULTI_DUAL_REG_SIMUL_AND_INJECTED_SIMUL);
 
-        adc_disable_external_trigger_regular(ADC2);
-        ADC_CCR &= ~(ADC_CCR_DMA_MASK | ADC_CCR_DDS);
-        ADC_CCR |= ADC_CCR_DMA_MODE_1 | ADC_CCR_DDS;
-        adc_set_multi_mode(ADC_CCR_MULTI_DUAL_REG_SIMUL_AND_INJECTED_SIMUL);
-
-        adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR_SMP_15CYC);
-        adc_set_sample_time(ADC2, ADC_CHANNEL2, ADC_SMPR_SMP_15CYC);
-        adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
-    }
-    else if(adc_mode == INTERLEAVED_ADC)
-    {
-        uint8_t channels1[] = {ADC_CHANNEL1};
-        uint8_t channels2[] = {ADC_CHANNEL1};
-        uint8_t channels3[] = {ADC_CHANNEL1};
-
-        adc_set_regular_sequence(ADC1, 1, channels1);
-        adc_set_regular_sequence(ADC2, 1, channels2);
-        adc_set_regular_sequence(ADC3, 1, channels3);
-
-        adc_disable_external_trigger_regular(ADC2);
-        adc_disable_external_trigger_regular(ADC3);
-        ADC_CCR &= ~(ADC_CCR_DMA_MASK | ADC_CCR_DDS);
-        ADC_CCR |= ADC_CCR_DMA_MODE_1 | ADC_CCR_DDS;
-        adc_set_multi_mode(ADC_CCR_MULTI_TRIPLE_INTERLEAVED);
-
-        adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR_SMP_3CYC);
-        adc_set_sample_time(ADC2, ADC_CHANNEL1, ADC_SMPR_SMP_3CYC);
-        adc_set_sample_time(ADC3, ADC_CHANNEL1, ADC_SMPR_SMP_3CYC);
-        adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
-    }
+    adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR_SMP_15CYC);
+    adc_set_sample_time(ADC2, ADC_CHANNEL2, ADC_SMPR_SMP_15CYC);
+    adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
 
     adc_set_resolution(ADC1, ADC_CR1_RES_12BIT);
     adc_set_resolution(ADC2, ADC_CR1_RES_12BIT);
@@ -544,18 +461,12 @@ void adc_setup()
 
     adc_set_right_aligned(ADC1);
     adc_set_right_aligned(ADC2);
-
 	adc_set_right_aligned(ADC3);
+
     adc_power_on(ADC1);
-    if(adc_mode == DUAL_ADC)
-    {
-	   adc_power_on(ADC2);
-    }
-    else if(adc_mode == OVERSAMPLED_ADC)
-    {
-       adc_power_on(ADC2);
-       adc_power_on(ADC3);
-    }
+    adc_power_on(ADC2);
+    // adc_power_on(ADC3);
+
 }
 
 void exti_timer_setup()
@@ -610,9 +521,6 @@ int main(void)
     gpio_mode_setup(GPIOD, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO15 | GPIO14 | GPIO13 | GPIO12);
     gpio_set_af(GPIOA, GPIO_AF10, GPIO9 | GPIO11 | GPIO12);
 
-    adc_mode = OVERSAMPLED_ADC;
-    // adc_mode = DUAL_ADC;
-    // adc_mode = REGULAR_ADC;
     dma_setup();
     adc_setup();
     timer_setup();
@@ -637,21 +545,6 @@ int main(void)
 
         if(head_ptr == tail_ptr)
             continue;
-
-        if(!accumulate_onboard)
-        {
-            if(usbd_ep_write_packet(usbd_dev, 0x81, data_bufs[tail_ptr].data, DATA_BUF_BYTES) != 0)
-            {
-                gpio_toggle(GPIOD, GPIO15);
-
-                tail_ptr = (tail_ptr+1);
-                if(tail_ptr >= NUM_BUFFERS)
-                    tail_ptr = 0;
-                if(sent_counter < NUM_BUFFERS*2)
-                    sent_counter++;
-            }
-        }
-
     }
 }
 
@@ -666,159 +559,35 @@ void dma2_stream0_isr()
     {
         dma_clear_interrupt_flags(DMA2, DMA_STREAM0, DMA_LISR_TCIF0);
 
-        if(!accumulate_onboard)
+        unsigned voltage, b0, b1;
+        short c, dptr;
+        int j;
+
+        for(i = 0, dptr = 1; i < OVERSAMPLED_ADC_SHORTS; i += OVERSAMPLED_RATIO*2*2)
         {
-            nhead = (head_ptr+1);
-            if(nhead >= NUM_BUFFERS)
-                nhead -= NUM_BUFFERS;
-            if(nhead == tail_ptr)
+            unsigned c_tot=0, v_tot=0;
+            unsigned pp_tot = 0, pv_tot = 0, pi_tot=0;
+
+            for(j = i; j < i+OVERSAMPLED_RATIO*2*2; j += 2)
             {
-                // If this happens: bad.
-                // The mostly happens when the host application exits uncleanly
-                // and the device is still capturing
-                head_ptr = tail_ptr = 0;
-                stop_measurement();
-                return;
+                a_data.energy_accum += dbuf0[j]*dbuf0[j+1];
+                pp_tot += dbuf0[j]*dbuf0[j+1];
+                pi_tot += dbuf0[j];
+                pv_tot += dbuf0[j+1];
+
+                a_data.n_samples += 1;
             }
-            head_ptr = nhead;
-        }
+            a_data.elapsed_time += tperiod;
+            pp_tot /= OVERSAMPLED_RATIO*2;
+            pv_tot /= OVERSAMPLED_RATIO*2;
+            pi_tot /= OVERSAMPLED_RATIO*2;
 
-
-
-        data_bufs[head_ptr].data[0] = tperiod>>3;
-        if(adc_mode == REGULAR_ADC)
-        {
-            unsigned voltage, b0, b1;
-            short c, dptr;
-
-            for(i = 0, c = 0, dptr = 1; i < REGULAR_ADC_SHORTS; ++i, ++c)
-            {
-                if(c == 15)
-                    c = 0;
-                if(c == 0)
-                    voltage = dbuf0[i];
-                else if((c&1) == 1)
-                {
-                    b0 = (dbuf0[i] * voltage) >> 12;
-                    data_bufs[head_ptr].data[dptr] = b0&0xFF;
-                    dptr++;
-                }
-                else
-                {
-                    b1 = (dbuf0[i] * voltage) >> 12;
-                    data_bufs[head_ptr].data[dptr] = b1&0xFF;
-                    dptr++;
-
-                    data_bufs[head_ptr].data[dptr] = (b0>>8) | ((b1>>4)&0xF0);
-                    dptr++;
-                }
-            }
-        }
-        else if(adc_mode == DUAL_ADC)
-        {
-            for(i = 0; i < DUAL_ADC_SHORTS/4; ++i)
-            {
-                // TODO: double check rounding
-                // unsigned b0 = ((((dbuf0[i*4+0] * dbuf0[i*4+1]) >> 11) + 1) >> 1);
-                // unsigned b1 = ((((dbuf0[i*4+2] * dbuf0[i*4+3]) >> 11) + 1) >> 1);
-                unsigned b0 = (dbuf0[i*4+0] * dbuf0[i*4+1]) >> 12;
-                unsigned b1 = (dbuf0[i*4+2] * dbuf0[i*4+3]) >> 12;
-                data_bufs[head_ptr].data[i*3+1] = b0&0xFF;
-                data_bufs[head_ptr].data[i*3+2] = b1&0xFF;
-                data_bufs[head_ptr].data[i*3+3] = (b0>>8) | ((b1>>4)&0xF0);
-            }
-        }
-        else if(adc_mode == OVERSAMPLED_ADC)
-        {
-            unsigned voltage, b0, b1;
-            short c, dptr;
-            int j;
-
-            data_bufs[head_ptr].data[0] = tperiod>>(3-OVERSAMPLED_BITS);
-
-            for(i = 0, dptr = 1; i < OVERSAMPLED_ADC_SHORTS; i += OVERSAMPLED_RATIO*2*2)
-            {
-                unsigned c_tot=0, v_tot=0;
-                unsigned pp_tot = 0, pv_tot = 0, pi_tot=0;
-
-                if(accumulate_onboard)
-                {
-                    for(j = i; j < i+OVERSAMPLED_RATIO*2*2; j += 2)
-                    {
-                        a_data.energy_accum += dbuf0[j]*dbuf0[j+1];
-                        pp_tot += dbuf0[j]*dbuf0[j+1];
-                        pi_tot += dbuf0[j];
-                        pv_tot += dbuf0[j+1];
-
-                        a_data.n_samples += 1;
-                    }
-                    a_data.elapsed_time += tperiod;
-                    pp_tot /= OVERSAMPLED_RATIO/2;
-                    pv_tot /= OVERSAMPLED_RATIO/2;
-                    pi_tot /= OVERSAMPLED_RATIO/2;
-
-                    if(pp_tot > a_data.peak_power)
-                        a_data.peak_power = pp_tot;
-                    if(pv_tot > a_data.peak_voltage)
-                        a_data.peak_voltage = pv_tot;
-                    if(pi_tot > a_data.peak_current)
-                        a_data.peak_current = pi_tot;
-                }
-                else
-                {
-                    for(j = i; j < i+OVERSAMPLED_RATIO*2; j += 2)
-                    {
-                        c_tot += dbuf0[j];
-                        v_tot += dbuf0[j+1];
-                    }
-                    c_tot = c_tot >> OVERSAMPLED_BITS;
-                    v_tot = v_tot >> OVERSAMPLED_BITS;
-
-                    b0 = (c_tot * v_tot) >> 12;
-
-                    c_tot=0;
-                    v_tot=0;
-
-                    for(; j < i+OVERSAMPLED_RATIO*2*2; j += 2)
-                    {
-                        c_tot += dbuf0[j];
-                        v_tot += dbuf0[j+1];
-                    }
-                    c_tot = c_tot >> OVERSAMPLED_BITS;
-                    v_tot = v_tot >> OVERSAMPLED_BITS;
-
-                    b1 = (c_tot * v_tot) >> 12;
-
-                    data_bufs[head_ptr].data[dptr] = b0&0xFF;
-                    dptr++;
-                    data_bufs[head_ptr].data[dptr] = b1&0xFF;
-                    dptr++;
-                    data_bufs[head_ptr].data[dptr] = (b0>>8) | ((b1>>4)&0xF0);
-                    dptr++;
-                }
-            }
-        }
-
-        if(running && !accumulate_onboard)
-        {
-            // dif is number of full buffers
-            int dif = (head_ptr+NUM_BUFFERS-tail_ptr);
-            int err;
-
-            if(dif >= NUM_BUFFERS)
-                dif -= NUM_BUFFERS;
-
-            err = 32 - dif;
-
-            if(sent_counter < NUM_BUFFERS)
-                err = (int)((float)err * ((float)sent_counter/(float)(NUM_BUFFERS)));
-
-            tperiod -= ((err>>4) + ((err - lastErr)<<3));
-            if(tperiod < 8)
-                tperiod = 8;
-            lastErr = err;
-
-            timer_set_period(TIM2, tperiod >> 3);
+            if(pp_tot > a_data.peak_power)
+                a_data.peak_power = pp_tot;
+            if(pv_tot > a_data.peak_voltage)
+                a_data.peak_voltage = pv_tot;
+            if(pi_tot > a_data.peak_current)
+                a_data.peak_current = pi_tot;
         }
     }
 }
