@@ -109,6 +109,8 @@ typedef struct {
     unsigned peak_voltage;
     unsigned peak_current;
     unsigned n_samples;
+    uint64_t avg_current;
+    uint64_t avg_voltage;
 } accumulated_data;
 //uint64_t energy_accum=123;
 
@@ -191,8 +193,10 @@ void start_measurement()
     a_data.peak_voltage = 0;
     a_data.peak_current = 0;
     a_data.n_samples = 0;
+    a_data.avg_voltage = 0;
+    a_data.avg_current = 0;
 
-    tperiod = 5000;
+    tperiod =500;
 
     adc_power_on(ADC1);
 
@@ -536,7 +540,7 @@ void process_buffer(power_data *pd)
     {
         unsigned short c = pd->data[i+1];
         unsigned short v = pd->data[i];
-        unsigned short p = c*v;
+        unsigned p = c*v;
 
         a_data.energy_accum += p;
         pp_tot += p;
@@ -545,6 +549,8 @@ void process_buffer(power_data *pd)
 
         a_data.n_samples += 1;
         a_data.elapsed_time += tperiod;
+        a_data.avg_voltage += v;
+        a_data.avg_current += c;
     }
 
     pp_tot /= n_samples/2;

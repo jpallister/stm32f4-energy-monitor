@@ -13,8 +13,8 @@ class Measurement(object):
         pass
 
 class EnergyMonitor(object):
-    MeasurementData = namedtuple('MeasurementData', 'energy_accum elapsed_time peak_power peak_voltage peak_current n_samples')
-    MeasurementData_packing = "=QQLLLL"
+    MeasurementData = namedtuple('MeasurementData', 'energy_accum elapsed_time peak_power peak_voltage peak_current n_samples avg_current avg_voltage')
+    MeasurementData_packing = "=QQLLLLQQ"
 
     def __init__(self, serial="EE00"):
         # Find the usb device that corresponds to the serial number
@@ -33,7 +33,7 @@ class EnergyMonitor(object):
         defaultparams = {'resistor':1, 'gain':50, 'vref':3}
         self.measurement_params = {i : copy(defaultparams) for i in range(1,4)}
 
-        self.samplePeriod = 200
+        self.samplePeriod = 500
 
     def connect(self):
         self.dev.set_configuration()
@@ -41,12 +41,20 @@ class EnergyMonitor(object):
     def toggleLEDs(self):
         self.dev.ctrl_transfer(0x41, 0, 0, 0, None)
 
+    def start(self):
+        self.dev.ctrl_transfer(0x41, 1, 0, 0, None)
+
+    def stop(self):
+        self.dev.ctrl_transfer(0x41, 2, 0, 0, None)
+
     def convertData(self, md, resistor, gain, vref, samplePeriod):
-        en = float(vref)**2 / gain / resistor / 4096**2 * 2 * samplePeriod * 2 / 168000000. * md.energy_accum
-        el = md.elapsed_time * 2. / 168000000
+        en = float(vref)**2 / gain / resistor / 4096**2 * 2 * samplePeriod * 2 / 168000000. * md.energy_accum * 2
+        el = md.elapsed_time * 2. / 168000000 * 2
         pp = float(vref)**2 / gain / resistor / 4096**2 * md.peak_power * 2
         pv = float(vref) / 4096. * md.peak_voltage * 2
         pi = float(vref) / gain / resistor / 4096. * md.peak_current
+        av = float(vref) / 4096. * md.avg_voltage / md.n_samples * 2
+        ai = float(vref) / gain / resistor / 4096. * md.avg_current / md.n_samples
 
         print "Peak power   (W):", pp
         print "Peak voltage (v):", pv
@@ -54,10 +62,12 @@ class EnergyMonitor(object):
         print "Energy       (J):", en
         print "Time         (s):", el
         print "Avg Power    (W):", en/el
+        print "Avg voltage  (V):", av
+        print "Avg current  (A):", ai
         print md
 
     def getMeasurement(self, m_point=1):
-        b = self.dev.ctrl_transfer(0xc1, 6, 0, 0, 32)
+        b = self.dev.ctrl_transfer(0xc1, 6, 0, 0, 48)
         u = EnergyMonitor.MeasurementData._make(unpack(EnergyMonitor.MeasurementData_packing, b))
 
         self.convertData(u, samplePeriod=self.samplePeriod, **self.measurement_params[m_point])
@@ -69,8 +79,16 @@ class EnergyMonitor(object):
 
 
 if __name__ == "__main__":
+    from time import sleep
+
     em = EnergyMonitor("EE00")
     em.connect()
 
     em.toggleLEDs()
+
+    em.measurement_params[1]['resistor'] = 1
+    em.start()
+    sleep(1)
+    em.stop()
+    sleep(0.1)
     em.getMeasurement()
