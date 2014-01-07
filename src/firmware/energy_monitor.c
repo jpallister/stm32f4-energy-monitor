@@ -175,14 +175,15 @@ void start_measurement()
     a_data.peak_power = 0;
     a_data.peak_voltage = 0;
     a_data.peak_current = 0;
+    a_data.n_samples = 0;
 
-    tperiod = 800;
+    tperiod = 500;
 
-    timer_set_period(TIM2, tperiod>>2);
+    timer_set_period(TIM2, tperiod);
     timer_enable_counter(TIM2);
 
     adc_power_on(ADC1);
-    adc_power_on(ADC2);
+    // adc_power_on(ADC2);
     // adc_power_on(ADC3);
     gpio_set(GPIOD, GPIO12);
 }
@@ -194,7 +195,7 @@ void stop_measurement()
     tail_ptr = 0;
     timer_disable_counter(TIM2);
     adc_off(ADC1);
-    adc_off(ADC2);
+    // adc_off(ADC2);
     // adc_off(ADC3);
         gpio_clear(GPIOD, GPIO12);
 }
@@ -354,9 +355,7 @@ static void usbdev_set_config(usbd_device *usbd_dev, uint16_t wValue)
 #define REGULAR_ADC_SHORTS  45
 #define DUAL_ADC_SHORTS     (42*2)
 
-#define OVERSAMPLED_BITS    1
-#define OVERSAMPLED_RATIO   (1<<OVERSAMPLED_BITS)
-#define OVERSAMPLED_ADC_SHORTS     (42*2*OVERSAMPLED_RATIO)
+#define DMA_SHORTS          128
 
 typedef struct {
     unsigned char data[DATA_BUF_BYTES];
@@ -364,7 +363,8 @@ typedef struct {
 
 power_data data_bufs[NUM_BUFFERS] = {0};
 
-unsigned short dbuf0[OVERSAMPLED_ADC_SHORTS] __attribute__ ((aligned (8)));
+unsigned short dbuf0[DMA_SHORTS] __attribute__ ((aligned (8)));
+unsigned short dbuf1[DMA_SHORTS] __attribute__ ((aligned (8)));
 int sent_counter=0;
 
 
@@ -373,10 +373,14 @@ void dma_setup()
 {
     dma_stream_reset(DMA2, DMA_STREAM0);
 
-    dma_set_peripheral_address(DMA2, DMA_STREAM0, (uint32_t)&ADC_CDR);
-    dma_set_number_of_data(DMA2, DMA_STREAM0, OVERSAMPLED_ADC_SHORTS);
+    dma_set_peripheral_address(DMA2, DMA_STREAM0, (uint32_t)&ADC1_DR);
+    dma_set_number_of_data(DMA2, DMA_STREAM0, DMA_SHORTS);
 
     dma_set_memory_address(DMA2, DMA_STREAM0, (uint32_t)&dbuf0);
+    dma_set_memory_address_1(DMA2, DMA_STREAM0, (uint32_t)&dbuf1);
+    dma_set_initial_target(DMA2, DMA_STREAM0, 0);
+    dma_enable_double_buffer_mode(DMA2, DMA_STREAM0);
+
     dma_set_transfer_mode(DMA2, DMA_STREAM0, DMA_SxCR_DIR_PERIPHERAL_TO_MEM);
     dma_enable_memory_increment_mode(DMA2, DMA_STREAM0);
     dma_set_peripheral_size(DMA2, DMA_STREAM0, DMA_SxCR_PSIZE_16BIT);
@@ -385,13 +389,17 @@ void dma_setup()
     dma_enable_circular_mode(DMA2, DMA_STREAM0);
     dma_channel_select(DMA2, DMA_STREAM0, DMA_SxCR_CHSEL_0);
     dma_set_peripheral_burst(DMA2, DMA_STREAM0, DMA_SxCR_PBURST_SINGLE);
-    dma_set_memory_burst(DMA2, DMA_STREAM0, DMA_SxCR_MBURST_SINGLE);
+    dma_set_memory_burst(DMA2, DMA_STREAM0, DMA_SxCR_MBURST_INCR4);
+    dma_enable_fifo_mode(DMA2, DMA_STREAM0);
+    dma_set_fifo_threshold(DMA2, DMA_STREAM0, DMA_SxFCR_FTH_4_4_FULL);
 
     dma_enable_transfer_complete_interrupt(DMA2, DMA_STREAM0);
+    dma_enable_fifo_error_interrupt(DMA2, DMA_STREAM0);
+    dma_enable_transfer_error_interrupt(DMA2, DMA_STREAM0);
 
     nvic_set_priority(NVIC_DMA2_STREAM0_IRQ, 1);
     nvic_enable_irq(NVIC_DMA2_STREAM0_IRQ);
-    dma_enable_stream(DMA2, DMA_STREAM0);
+    // dma_enable_stream(DMA2, DMA_STREAM0);
 }
 
 void timer_setup()
@@ -401,7 +409,7 @@ void timer_setup()
     timer_disable_counter(TIM2);
     timer_reset(TIM2);
     timer_set_mode(TIM2, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
-    timer_set_period(TIM2, tperiod>>2);
+    timer_set_period(TIM2, tperiod);
     timer_set_prescaler(TIM2, 0);
     timer_set_clock_division(TIM2, TIM_CR1_CKD_CK_INT);
     timer_set_master_mode(TIM2, TIM_CR2_MMS_UPDATE);
@@ -416,17 +424,21 @@ void adc_setup()
     rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_ADC1EN);
     rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_ADC2EN);
     rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_ADC3EN);
+    rcc_peripheral_reset(&RCC_APB2ENR, RCC_APB2RSTR_ADCRST);
     adc_off(ADC1);
     adc_off(ADC2);
+    adc_off(ADC3);
 
+    ADC_CCR = 0;
     adc_set_clk_prescale(0);
     adc_set_single_conversion_mode(ADC1);
     adc_set_single_conversion_mode(ADC2);
 	adc_set_single_conversion_mode(ADC3);
 
     // Input 1
-    uint8_t channels1[] = {ADC_CHANNEL2};   // Voltage, PA2, ADC123
-    uint8_t channels2[] = {ADC_CHANNEL12};  // Current, PC2, ADC123
+    uint8_t channels1[] = {2, 12};   // Voltage, PA2, ADC123
+    // uint8_t channels1[] = {ADC_CHANNEL2, ADC_CHANNEL12};   // Voltage, PA2, ADC123
+    // uint8_t channels2[] = {ADC_CHANNEL12};  // Current, PC2, ADC123
     // Input 2
     // uint8_t channels1[] = {ADC_CHANNEL3};   // Voltage, PA3, ADC123
     // uint8_t channels2[] = {ADC_CHANNEL1};   // Current, PA1, ADC123
@@ -436,37 +448,42 @@ void adc_setup()
     // Input self
     // uint8_t channels1[] = {ADC_CHANNEL8};   // Voltage, PB0, ADC12
     // uint8_t channels2[] = {ADC_CHANNEL14};  // Current, PC4, ADC12
-    adc_set_regular_sequence(ADC1, 1, channels1);
-    adc_set_regular_sequence(ADC2, 1, channels2);
+    adc_set_regular_sequence(ADC1, 2, channels1);
+    // adc_enable_discontinuous_mode_regular(ADC1, 1);
+    adc_enable_scan_mode(ADC1);
+    // adc_set_regular_sequence(ADC2, 1, channels2);
 
     adc_disable_external_trigger_regular(ADC2);
-    ADC_CCR &= ~(ADC_CCR_DMA_MASK | ADC_CCR_DDS);
-    ADC_CCR |= ADC_CCR_DMA_MODE_1 | ADC_CCR_DDS;
-    adc_set_multi_mode(ADC_CCR_MULTI_DUAL_REG_SIMUL_AND_INJECTED_SIMUL);
 
-    adc_set_sample_time(ADC1, ADC_CHANNEL1, ADC_SMPR_SMP_15CYC);
-    adc_set_sample_time(ADC2, ADC_CHANNEL2, ADC_SMPR_SMP_15CYC);
+    adc_set_sample_time(ADC1, ADC_CHANNEL2, ADC_SMPR_SMP_15CYC);
+    adc_set_sample_time(ADC1, ADC_CHANNEL12, ADC_SMPR_SMP_15CYC);
     adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
 
     adc_set_resolution(ADC1, ADC_CR1_RES_12BIT);
     adc_set_resolution(ADC2, ADC_CR1_RES_12BIT);
     adc_set_resolution(ADC3, ADC_CR1_RES_12BIT);
 
-    adc_enable_dma(ADC1);
-    adc_enable_dma(ADC2);
-    adc_enable_dma(ADC3);
+    // adc_enable_dma(ADC1);
+    // adc_enable_dma(ADC2);
+    // adc_enable_dma(ADC3);
     adc_set_dma_continue(ADC1);
-    adc_set_dma_continue(ADC2);
-    adc_set_dma_continue(ADC3);
+    // adc_set_dma_continue(ADC2);
+    // adc_set_dma_continue(ADC3);
 
     adc_set_right_aligned(ADC1);
-    adc_set_right_aligned(ADC2);
-	adc_set_right_aligned(ADC3);
+    // adc_set_right_aligned(ADC2);
+	// adc_set_right_aligned(ADC3);
+
+    adc_enable_overrun_interrupt(ADC1);
+
+    adc_enable_eoc_interrupt(ADC1);
+    adc_eoc_after_each(ADC1);
 
     adc_power_on(ADC1);
-    adc_power_on(ADC2);
+    // adc_power_on(ADC2);
     // adc_power_on(ADC3);
 
+    nvic_enable_irq(NVIC_ADC_IRQ);
 }
 
 void exti_timer_setup()
@@ -501,6 +518,47 @@ char interrupt_buf[4]= {0};
 
 uint8_t control_buffer[128] __attribute__((aligned (16)));
 
+short *buffer_to_process=NULL;
+
+void process_buffer(unsigned short *cur_buf)
+{
+    int i;
+    unsigned pp_tot = 0, pv_tot = 0, pi_tot=0;
+
+    for(i = 0; i < DMA_SHORTS; i+=2)
+    {
+        unsigned short c = cur_buf[i+1];
+        unsigned short v = cur_buf[i];
+        unsigned short p = c*v;
+        a_data.energy_accum += p;
+        pp_tot += p;
+        pi_tot += c;
+        pv_tot += v;
+
+        a_data.n_samples += 1;
+        a_data.elapsed_time += tperiod;
+
+        // if(cur_buf[i] < 2000 || cur_buf[i] > 2100)
+        // {
+        //     // dma_disable_stream(DMA2, DMA_STREAM0);
+        //     // while(1);
+        // gpio_toggle(GPIOD, GPIO15);
+        // }
+        // gpio_toggle(GPIOD, GPIO14);
+    }
+
+    pp_tot /= DMA_SHORTS/2;
+    pv_tot /= DMA_SHORTS/2;
+    pi_tot /= DMA_SHORTS/2;
+
+    if(pp_tot > a_data.peak_power)
+        a_data.peak_power = pp_tot;
+    if(pv_tot > a_data.peak_voltage)
+        a_data.peak_voltage = pv_tot;
+    if(pi_tot > a_data.peak_current)
+        a_data.peak_current = pi_tot;
+
+}
 
 int main(void)
 {
@@ -543,8 +601,11 @@ int main(void)
             send_int = 0;
         }
 
-        if(head_ptr == tail_ptr)
-            continue;
+        if(buffer_to_process != NULL)
+        {
+            process_buffer(buffer_to_process);
+            buffer_to_process = NULL;
+        }
     }
 }
 
@@ -555,41 +616,32 @@ void dma2_stream0_isr()
 {
     int nhead,i;
 
-    if((DMA2_LISR & DMA_LISR_TCIF0) != 0)
+    // if((DMA2_LISR & DMA_LISR_TCIF0) != 0)
     {
-        dma_clear_interrupt_flags(DMA2, DMA_STREAM0, DMA_LISR_TCIF0);
-
         unsigned voltage, b0, b1;
         short c, dptr;
-        int j;
 
-        for(i = 0, dptr = 1; i < OVERSAMPLED_ADC_SHORTS; i += OVERSAMPLED_RATIO*2*2)
+        unsigned short * cur_buf;
+
+        // dma_clear_interrupt_flags(DMA2, DMA_STREAM0, DMA_LISR_TCIF0);
+
+        // if(adc_get_overrun_flag(ADC1))
+        //     while(1);
+
+        // if(dma_get_target(DMA2, DMA_STREAM0) == 0)
+        //     cur_buf = dbuf1;
+        // else
+            cur_buf = dbuf0;
+
+        if(buffer_to_process == NULL)
         {
-            unsigned c_tot=0, v_tot=0;
-            unsigned pp_tot = 0, pv_tot = 0, pi_tot=0;
-
-            for(j = i; j < i+OVERSAMPLED_RATIO*2*2; j += 2)
-            {
-                a_data.energy_accum += dbuf0[j]*dbuf0[j+1];
-                pp_tot += dbuf0[j]*dbuf0[j+1];
-                pi_tot += dbuf0[j];
-                pv_tot += dbuf0[j+1];
-
-                a_data.n_samples += 1;
-            }
-            a_data.elapsed_time += tperiod;
-            pp_tot /= OVERSAMPLED_RATIO*2;
-            pv_tot /= OVERSAMPLED_RATIO*2;
-            pi_tot /= OVERSAMPLED_RATIO*2;
-
-            if(pp_tot > a_data.peak_power)
-                a_data.peak_power = pp_tot;
-            if(pv_tot > a_data.peak_voltage)
-                a_data.peak_voltage = pv_tot;
-            if(pi_tot > a_data.peak_current)
-                a_data.peak_current = pi_tot;
+            buffer_to_process = cur_buf;
         }
     }
+    // else
+    // {/
+    //     while(1);
+    // }
 }
 
 int status = -1;
@@ -641,4 +693,41 @@ void tim3_isr()
 void exit(int a)
 {
     while(1);
+}
+
+// TODO, calculations here instead of dma
+int nbuff = 0;
+unsigned last = 0;
+void adc_isr()
+{
+    if(adc_eoc(ADC1))
+    {
+        dbuf0[nbuff++] = ADC1_DR;
+
+        if(abs(dbuf0[nbuff-1] - last) < 20 && last != 0)
+        {
+            while(1);
+        }
+        last = dbuf0[nbuff-1];
+
+        // if(nbuff > DMA_SHORTS)while(1);
+
+        if(nbuff >= DMA_SHORTS)
+        {
+            nbuff = 0;
+
+            if(buffer_to_process == NULL)
+            {
+                buffer_to_process = dbuf0;
+            }
+            else
+                while(1);
+        }
+        adc_enable_eoc_interrupt(ADC1);
+    }
+    if(adc_get_overrun_flag(ADC1))
+    {
+    gpio_toggle(GPIOD, GPIO15);
+        while(1);
+    }
 }
