@@ -423,7 +423,7 @@ void adc_setup()
     adc_set_single_conversion_mode(ADC1);
     // adc_set_single_conversion_mode(ADC2);
 	// adc_set_single_conversion_mode(ADC3);
-    adc_enable_scan_mode(ADC1);
+    // adc_enable_scan_mode(ADC1);
 
     // Input 1
     uint8_t channels1[] = {2, 12};   // CH2 Voltage, PA2, ADC123
@@ -438,8 +438,8 @@ void adc_setup()
     // Input self
     // uint8_t channels1[] = {ADC_CHANNEL8};   // Voltage, PB0, ADC12
     // uint8_t channels2[] = {ADC_CHANNEL14};  // Current, PC4, ADC12
-    adc_set_regular_sequence(ADC1, 2, channels1);
-    adc_enable_discontinuous_mode_regular(ADC1, ADC_CR1_DISCNUM_1CHANNELS );
+    adc_set_regular_sequence(ADC1, 1, channels1);
+    // adc_enable_discontinuous_mode_regular(ADC1, ADC_CR1_DISCNUM_1CHANNELS );
     // adc_set_regular_sequence(ADC2, 1, channels2);
 
     // adc_disable_external_trigger_regular(ADC2);
@@ -468,13 +468,13 @@ void adc_setup()
     adc_eoc_after_each(ADC1);
 
 
-    ADC1_CR1 = 0x04000920;
-    ADC1_CR2 = 0x16000400;
-    ADC1_SMPR1 = 0x01249249;
-    ADC1_SMPR2 = 0x09249249;
-    ADC1_SQR1  = 0x00100000;
-    ADC1_SQR2  = 0x00000000;
-    ADC1_SQR3  = 0x00000182;
+    // ADC1_CR1 = 0x04000920;
+    // ADC1_CR2 = 0x16000400;
+    // ADC1_SMPR1 = 0x01249249;
+    // ADC1_SMPR2 = 0x09249249;
+    // ADC1_SQR1  = 0x00100000;
+    // ADC1_SQR2  = 0x00000000;
+    // ADC1_SQR3  = 0x00000182;
 
     adc_power_on(ADC1);
     // adc_power_on(ADC2);
@@ -740,6 +740,17 @@ void adc_isr()
             if(tail_ptr == head_ptr)
                 error_condition();
         }
+
+        // HACK. Here we initialise the next channel to read from
+        // because very occasionally the ADC seems to skip the next channel
+        // suspect an odd timing bug, but only happens 1/10000000 times.
+        unsigned char chan[1];
+
+        if((pd->idx&1) == 0)
+            chan[0] = 2;
+        else
+            chan[0] = 12;
+        adc_set_regular_sequence(ADC1, 1, chan);
         adc_enable_eoc_interrupt(ADC1);
         // ADC_SR(ADC1) &= ~ADC_SR_JEOC;
     }
