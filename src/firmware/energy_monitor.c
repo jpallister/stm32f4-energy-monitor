@@ -304,6 +304,10 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
         *buf = &a_data;
         break;
     }
+    case 7:     // Map ADC to measurement point
+    {
+        break;
+    }
     default:
         return 0;
     }

@@ -31,21 +31,54 @@ class EnergyMonitor(object):
 
         # Set up default parameters for each measurement point
         defaultparams = {'resistor':1, 'gain':50, 'vref':3}
-        self.measurement_params = {i : copy(defaultparams) for i in range(1,4)}
+        self.measurement_params = {i : copy(defaultparams) for i in [1,2,3]}
 
+        # Measurement point 4 is the 'self' measurement point
+        self.measurement_params[4] = {'resistor':0.5, 'gain':50, 'vref':3}
+
+        # Equal to tperiod in the firmware
         self.samplePeriod = 500
 
+        self.adcMpoint = [None, None, None]
+
+    # Connect to the device
     def connect(self):
         self.dev.set_configuration()
 
+    # Toggle the LEDs on the device
     def toggleLEDs(self):
         self.dev.ctrl_transfer(0x41, 0, 0, 0, None)
 
-    def start(self):
-        self.dev.ctrl_transfer(0x41, 1, 0, 0, None)
+    # Start measuring on m_point
+    def start(self, m_point=1):
+        self.dev.ctrl_transfer(0x41, 1, int(m_point), 0, None)
 
-    def stop(self):
-        self.dev.ctrl_transfer(0x41, 2, 0, 0, None)
+    # Stop measuring on m_point
+    def stop(self, m_point=1):
+        self.dev.ctrl_transfer(0x41, 2, int(m_point), 0, None)
+
+    # Enable a particular measurement point. There are
+    # only 3 ADCs in the device, so only 3 measurement points
+    # can be used simultaneously
+    def enableMeasurementPoint(self, m_point):
+        if m_point in self.adcMpoint:
+            warning("Tried to enable already enabled measurement point "+str(m_point))
+            return
+        if self.adcMpoint.count(None) == 0:
+            raise RuntimeError("Cannot enable measurement point {}. Maximum of enabled measurement points reached".format(m_point))
+
+        adc = self.adcMpoint.index(None)
+        self.adcMpoint[adc] = m_point
+        self.dev.ctrl_transfer(0x41, 7, int(m_point), adc, None)
+
+    # Disable a particular measurement point, so that the
+    # ADC could potentially be used with a different one
+    def disableMeasurementPoint(self, m_point):
+        if m_point not in self.adcMpoint:
+            warning("Tried to disable already disabled measurement point "+str(m_point))
+        adc = self.adcMpoint.index(m_point)
+        self.adcMpoint[adc] = None
+        # TODO: perhaps a control transfer to actually disable the mpoint
 
     def convertData(self, md, resistor, gain, vref, samplePeriod):
         en = float(vref)**2 / gain / resistor / 4096**2 * 2 * samplePeriod * 2 / 168000000. * md.energy_accum * 2
@@ -67,7 +100,7 @@ class EnergyMonitor(object):
         print md
 
     def getMeasurement(self, m_point=1):
-        b = self.dev.ctrl_transfer(0xc1, 6, 0, 0, 48)
+        b = self.dev.ctrl_transfer(0xc1, 6, int(m_point), 0, 48)
         u = EnergyMonitor.MeasurementData._make(unpack(EnergyMonitor.MeasurementData_packing, b))
 
         self.convertData(u, samplePeriod=self.samplePeriod, **self.measurement_params[m_point])
