@@ -98,9 +98,7 @@ static const char *usb_strings[] = {
 void dma_setup();
 void adc_setup();
 
-int running = 0;
-int head_ptr = 0, tail_ptr = 0;
-int trigger_port = -1, trigger_pin = -1;
+// Accumulated data, to be sent back ////////////////////////////////
 
 typedef struct {
     uint64_t energy_accum;
@@ -112,17 +110,13 @@ typedef struct {
     uint64_t avg_current;
     uint64_t avg_voltage;
 } accumulated_data;
-//uint64_t energy_accum=123;
 
 accumulated_data a_data;
 
-unsigned n_samples=0;
+int tperiod=500;
 
-#define TPERIOD_INIT    1600
 
-int tperiod=TPERIOD_INIT;
-
-// Data structs
+// Power data temporary storage /////////////////////////////////////
 
 #define NUM_BUFFERS         64
 #define DMA_SHORTS          128
@@ -134,9 +128,21 @@ typedef struct {
 
 power_data data_bufs[NUM_BUFFERS] = {0};
 
-int sent_counter=0;
+int running = 0; // Are we collecting measurements
 
+// Implement a circular buffer in data_bufs
+int head_ptr = 0, tail_ptr = 0;
+int trigger_port = -1, trigger_pin = -1;
 
+// USB communication globals ////////////////////////////////////////
+usbd_device *usbd_dev;
+
+int send_int = 0;
+char interrupt_buf[4]= {0};
+
+uint8_t control_buffer[128] __attribute__((aligned (16)));
+
+/////////////////////////////////////////////////////////////////////
 
 void exti_setup()
 {
@@ -185,7 +191,6 @@ void start_measurement()
     running = 1;
     head_ptr = 0;
     tail_ptr = 0;
-    n_samples = 0;
 
     a_data.energy_accum = 0;
     a_data.elapsed_time = 0;
@@ -196,7 +201,7 @@ void start_measurement()
     a_data.avg_voltage = 0;
     a_data.avg_current = 0;
 
-    tperiod =500;
+    tperiod = 500;
 
     adc_power_on(ADC1);
 
@@ -211,10 +216,7 @@ void start_measurement()
 void stop_measurement()
 {
     running = 0;
-    // head_ptr = 0;
-    // tail_ptr = 0;
     timer_disable_counter(TIM2);
-    // adc_off(ADC1);
     gpio_clear(GPIOD, GPIO12);
 }
 
@@ -360,39 +362,6 @@ static void usbdev_set_config(usbd_device *usbd_dev, uint16_t wValue)
     usbd_register_reset_callback(usbd_dev, usb_reset_cb);
 }
 
-// void dma_setup()
-// {
-//     dma_stream_reset(DMA2, DMA_STREAM0);
-
-//     dma_set_peripheral_address(DMA2, DMA_STREAM0, (uint32_t)&ADC1_DR);
-//     dma_set_number_of_data(DMA2, DMA_STREAM0, DMA_SHORTS);
-
-//     dma_set_memory_address(DMA2, DMA_STREAM0, (uint32_t)&dbuf0);
-//     dma_set_memory_address_1(DMA2, DMA_STREAM0, (uint32_t)&dbuf1);
-//     dma_set_initial_target(DMA2, DMA_STREAM0, 0);
-//     dma_enable_double_buffer_mode(DMA2, DMA_STREAM0);
-
-//     dma_set_transfer_mode(DMA2, DMA_STREAM0, DMA_SxCR_DIR_PERIPHERAL_TO_MEM);
-//     dma_enable_memory_increment_mode(DMA2, DMA_STREAM0);
-//     dma_set_peripheral_size(DMA2, DMA_STREAM0, DMA_SxCR_PSIZE_16BIT);
-//     dma_set_memory_size(DMA2, DMA_STREAM0, DMA_SxCR_MSIZE_16BIT);
-//     dma_set_priority(DMA2, DMA_STREAM0, DMA_SxCR_PL_HIGH);
-//     dma_enable_circular_mode(DMA2, DMA_STREAM0);
-//     dma_channel_select(DMA2, DMA_STREAM0, DMA_SxCR_CHSEL_0);
-//     dma_set_peripheral_burst(DMA2, DMA_STREAM0, DMA_SxCR_PBURST_SINGLE);
-//     dma_set_memory_burst(DMA2, DMA_STREAM0, DMA_SxCR_MBURST_INCR4);
-//     dma_enable_fifo_mode(DMA2, DMA_STREAM0);
-//     dma_set_fifo_threshold(DMA2, DMA_STREAM0, DMA_SxFCR_FTH_4_4_FULL);
-
-//     dma_enable_transfer_complete_interrupt(DMA2, DMA_STREAM0);
-//     dma_enable_fifo_error_interrupt(DMA2, DMA_STREAM0);
-//     dma_enable_transfer_error_interrupt(DMA2, DMA_STREAM0);
-
-//     nvic_set_priority(NVIC_DMA2_STREAM0_IRQ, 1);
-//     nvic_enable_irq(NVIC_DMA2_STREAM0_IRQ);
-//     // dma_enable_stream(DMA2, DMA_STREAM0);
-// }
-
 void timer_setup()
 {
     rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_TIM2EN);
@@ -423,11 +392,8 @@ void adc_setup()
     ADC_CCR = 0;
     ADC1_CR1 = 0;
     ADC1_CR2 = 0;
-    // adc_set_clk_prescale(0);
+
     adc_set_single_conversion_mode(ADC1);
-    // adc_set_single_conversion_mode(ADC2);
-	// adc_set_single_conversion_mode(ADC3);
-    // adc_enable_scan_mode(ADC1);
 
     // Input 1
     uint8_t channels1[] = {2, 12};   // CH2 Voltage, PA2, ADC123
@@ -443,11 +409,6 @@ void adc_setup()
     // uint8_t channels1[] = {ADC_CHANNEL8};   // Voltage, PB0, ADC12
     // uint8_t channels2[] = {ADC_CHANNEL14};  // Current, PC4, ADC12
     adc_set_regular_sequence(ADC1, 1, channels1);
-    // adc_enable_discontinuous_mode_regular(ADC1, ADC_CR1_DISCNUM_1CHANNELS );
-    // adc_set_regular_sequence(ADC2, 1, channels2);
-
-    // adc_disable_external_trigger_regular(ADC2);
-
     adc_set_sample_time_on_all_channels(ADC1, ADC_SMPR_SMP_15CYC);
     adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
 
@@ -455,34 +416,14 @@ void adc_setup()
     adc_set_resolution(ADC2, ADC_CR1_RES_12BIT);
     adc_set_resolution(ADC3, ADC_CR1_RES_12BIT);
 
-    // adc_enable_dma(ADC1);
-    // adc_enable_dma(ADC2);
-    // adc_enable_dma(ADC3);
-    // adc_set_dma_continue(ADC1);
-    // adc_set_dma_continue(ADC2);
-    // adc_set_dma_continue(ADC3);
-
     adc_set_right_aligned(ADC1);
-    // adc_set_right_aligned(ADC2);
-	// adc_set_right_aligned(ADC3);
 
     adc_enable_overrun_interrupt(ADC1);
 
     adc_enable_eoc_interrupt(ADC1);
     adc_eoc_after_each(ADC1);
 
-
-    // ADC1_CR1 = 0x04000920;
-    // ADC1_CR2 = 0x16000400;
-    // ADC1_SMPR1 = 0x01249249;
-    // ADC1_SMPR2 = 0x09249249;
-    // ADC1_SQR1  = 0x00100000;
-    // ADC1_SQR2  = 0x00000000;
-    // ADC1_SQR3  = 0x00000182;
-
     adc_power_on(ADC1);
-    // adc_power_on(ADC2);
-    // adc_power_on(ADC3);
 
     nvic_set_priority(NVIC_ADC_IRQ, 0xF);
     nvic_enable_irq(NVIC_ADC_IRQ);
@@ -512,15 +453,6 @@ void exti_timer_setup()
     nvic_set_priority(NVIC_EXTI9_5_IRQ, 9);
     nvic_set_priority(NVIC_EXTI15_10_IRQ, 9);
 }
-
-usbd_device *usbd_dev;
-
-int send_int = 0;
-char interrupt_buf[4]= {0};
-
-uint8_t control_buffer[128] __attribute__((aligned (16)));
-
-short *buffer_to_process=NULL;
 
 void error_condition()
 {
@@ -620,40 +552,6 @@ int main(void)
 }
 
 
-// int lastErr = 0;
-
-// void dma2_stream0_isr()
-// {
-//     int nhead,i;
-
-//     // if((DMA2_LISR & DMA_LISR_TCIF0) != 0)
-//     {
-//         unsigned voltage, b0, b1;
-//         short c, dptr;
-
-//         unsigned short * cur_buf;
-
-//         // dma_clear_interrupt_flags(DMA2, DMA_STREAM0, DMA_LISR_TCIF0);
-
-//         // if(adc_get_overrun_flag(ADC1))
-//         //     while(1);
-
-//         // if(dma_get_target(DMA2, DMA_STREAM0) == 0)
-//         //     cur_buf = dbuf1;
-//         // else
-//             cur_buf = dbuf0;
-
-//         if(buffer_to_process == NULL)
-//         {
-//             buffer_to_process = cur_buf;
-//         }
-//     }
-//     // else
-//     // {/
-//     //     while(1);
-//     // }
-// }
-
 int status = -1;
 
 void exti0_isr () __attribute__ ((weak, alias ("exti_isr")));
@@ -705,9 +603,6 @@ void exit(int a)
     while(1);
 }
 
-// TODO, calculations here instead of dma
-int nbuff = 0;
-unsigned inisr = 0, last_cnt=0;
 void adc_isr()
 {
     if(adc_get_overrun_flag(ADC1))
@@ -717,23 +612,7 @@ void adc_isr()
     if(adc_eoc(ADC1))
     {
         power_data *pd = &data_bufs[tail_ptr];
-        unsigned a,b,c,d;
-
-        ADC_SR(ADC1) &= ~ADC_SR_EOC;
-        a = ADC1_DR;
-        // b = adc_read_injected(ADC1,2);
-        // c = adc_read_injected(ADC1,3);
-        // d = adc_read_injected(ADC1,4);
-
-        pd->data[pd->idx++] = a;
-        // pd->data[pd->idx++] = b;
-
-        // pd->data[pd->idx++] = adc_read_injected(ADC1,4);
-
-        // if(pd->idx < 128 && ((pd->idx-1) & 1) == 0 && pd->data[pd->idx-1] < 2000)
-        // {
-        //     while(1);
-        // }
+        pd->data[pd->idx++] = ADC1_DR;
 
         if(pd->idx >= DMA_SHORTS)
         {
@@ -758,7 +637,6 @@ void adc_isr()
             chan[0] = 12;
         adc_set_regular_sequence(ADC1, 1, chan);
         adc_enable_eoc_interrupt(ADC1);
-        // ADC_SR(ADC1) &= ~ADC_SR_JEOC;
     }
 
 }
