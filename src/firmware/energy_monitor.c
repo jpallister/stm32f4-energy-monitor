@@ -308,6 +308,12 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
     {
         break;
     }
+    case 8:     // Is running
+    {
+        *len = sizeof(running);
+        *buf = &running;
+        break;
+    }
     default:
         return 0;
     }
@@ -540,7 +546,7 @@ int main(void)
 
         if(send_int)
         {
-            usbd_ep_write_packet(usbd_dev, 0x82, interrupt_buf, 4);
+            // usbd_ep_write_packet(usbd_dev, 0x82, interrupt_buf, 4);
             send_int = 0;
         }
 

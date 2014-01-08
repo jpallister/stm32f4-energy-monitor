@@ -16,6 +16,10 @@ class EnergyMonitor(object):
     MeasurementData = namedtuple('MeasurementData', 'energy_accum elapsed_time peak_power peak_voltage peak_current n_samples avg_current avg_voltage')
     MeasurementData_packing = "=QQLLLLQQ"
 
+    ADC1 = 0
+    ADC2 = 0
+    ADC3 = 0
+
     def __init__(self, serial="EE00"):
         # Find the usb device that corresponds to the serial number
         devs = usb.core.find(idVendor=0xf539, idProduct=0xf539,
@@ -57,17 +61,39 @@ class EnergyMonitor(object):
     def stop(self, m_point=1):
         self.dev.ctrl_transfer(0x41, 2, int(m_point), 0, None)
 
+    def isRunning(self, m_point=1):
+        b = self.dev.ctrl_transfer(0xc1, 8, int(m_point), 0, 4)
+
+        running = unpack("=L", b)
+        return bool(running)
+
+    # Trigger
+    def setTrigger(self, port, m_point=1):
+
+        # TODO check port is of the form PA0
+        self.dev.ctrl_transfer(0x41, 4, ord(port[1]), int(port[2]), None)
+
     # Enable a particular measurement point. There are
     # only 3 ADCs in the device, so only 3 measurement points
     # can be used simultaneously
-    def enableMeasurementPoint(self, m_point):
+    def enableMeasurementPoint(self, m_point, adc=None):
         if m_point in self.adcMpoint:
             warning("Tried to enable already enabled measurement point "+str(m_point))
             return
         if self.adcMpoint.count(None) == 0:
             raise RuntimeError("Cannot enable measurement point {}. Maximum of enabled measurement points reached".format(m_point))
+        if adc is not None and self.adcMpoint[adc] is not None:
+            raise RuntimeError("Cannot enable map measurement point {0} to ADC{1}. ADC{1} already has measurement point {2}".format(m_point, adc, self.adcMpoint[adc]))
 
-        adc = self.adcMpoint.index(None)
+        if adc is None:
+            # If we want mpoint 1 or 2 and ADC3 is free, prioritise it
+            #  becuase ADC3 doesnt work with mpoint 3 or self
+            if m_point in [1, 2] and self.adcMpoint[2] is not None:
+                adc = 2
+            else:
+                adc = self.adcMpoint.index(None)
+        if m_point in [3,4] and adc == 2:
+            raise RuntimeError("Measurement point {} cannot be used with ADC3 (the only free ADC)".format(m_point))
         self.adcMpoint[adc] = m_point
         self.dev.ctrl_transfer(0x41, 7, int(m_point), adc, None)
 
@@ -120,8 +146,17 @@ if __name__ == "__main__":
     em.toggleLEDs()
 
     em.measurement_params[1]['resistor'] = 1
+    # em.enableMeasurementPoint(1)
     em.start()
     sleep(1)
     em.stop()
     sleep(0.1)
     em.getMeasurement()
+
+    sleep(1)
+    em.setTrigger("PA0")
+
+    while True:
+        print em.isRunning()
+        em.getMeasurement()
+        sleep(0.1)
