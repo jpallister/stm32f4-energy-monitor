@@ -116,7 +116,7 @@ class EnergyMonitor(object):
         if adc is None:
             # If we want mpoint 1 or 2 and ADC3 is free, prioritise it
             #  becuase ADC3 doesnt work with mpoint 3 or self
-            if m_point in [1, 2] and self.adcMpoint[2] is not None:
+            if m_point in [1, 2] and self.adcMpoint[2] is None:
                 adc = 2
             else:
                 adc = self.adcMpoint.index(None)
@@ -130,6 +130,7 @@ class EnergyMonitor(object):
     def disableMeasurementPoint(self, m_point):
         if m_point not in self.adcMpoint:
             warning("Tried to disable already disabled measurement point "+str(m_point))
+            return
         adc = self.adcMpoint.index(m_point)
         self.adcMpoint[adc] = None
         # TODO: perhaps a control transfer to actually disable the mpoint
@@ -173,9 +174,21 @@ if __name__ == "__main__":
 
     em.toggleLEDs()
 
-    # em.enableMeasurementPoint(1)
+    em.enableMeasurementPoint(1)
+    em.enableMeasurementPoint(2)
     em.setTrigger("PA0")
 
+    # em.start(1)
+    em.start(2)
+    em.start(1)
+    sleep(1)
+    em.stop(1)
+    em.stop(2)
+    # em.stop(1)
+    em.getMeasurement(1)
+    em.getMeasurement(2)
+
+    quit()
     print "*** Press the blue button to make a measurement"
 
     while True:

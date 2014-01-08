@@ -98,7 +98,10 @@ static const char *usb_strings[] = {
 void dma_setup();
 void adc_setup();
 
-// Accumulated data, to be sent back ////////////////////////////////
+// Power data ///////////////////////////////////////////////////////
+
+#define NUM_BUFFERS         128
+#define PWR_SAMPLES          64
 
 typedef struct {
     uint64_t energy_accum;
@@ -111,29 +114,32 @@ typedef struct {
     uint64_t avg_voltage;
 } accumulated_data;
 
-accumulated_data a_data;
-
-int tperiod=500;
-
-
-// Power data temporary storage /////////////////////////////////////
-
-#define NUM_BUFFERS         256
-#define DMA_SHORTS          128
-
 typedef struct {
-    unsigned short data[DMA_SHORTS];
+    unsigned short data[PWR_SAMPLES];
     unsigned short idx;
 } power_data;
 
-power_data data_bufs[NUM_BUFFERS] = {0};
+int tperiod=500;
 
-int running = 0; // Are we collecting measurements
-int number_of_runs = 0;
+typedef struct {
+    accumulated_data accum_data;
+    power_data data_bufs[NUM_BUFFERS];
 
-// Implement a circular buffer in data_bufs
-int head_ptr = 0, tail_ptr = 0;
-int trigger_port = -1, trigger_pin = -1;
+    int running; // Are we collecting measurements
+    int number_of_runs;
+
+    // Implement a circular buffer in data_bufs
+    int head_ptr, tail_ptr;
+    int trigger_port, trigger_pin;
+
+    int assigned_adc;
+
+    unsigned char chans[2];
+} measurement_point;
+
+measurement_point m_points[4] = {0};
+
+int adc_to_mpoint[3] = {-1, -1, -1};
 
 // USB communication globals ////////////////////////////////////////
 usbd_device *usbd_dev;
@@ -145,7 +151,7 @@ uint8_t control_buffer[128] __attribute__((aligned (16)));
 
 /////////////////////////////////////////////////////////////////////
 
-void exti_setup()
+void exti_setup(int m_point)
 {
     nvic_disable_irq(NVIC_EXTI0_IRQ);
     nvic_disable_irq(NVIC_EXTI1_IRQ);
@@ -158,15 +164,15 @@ void exti_setup()
     exti_reset_request(EXTI0 | EXTI1 | EXTI2 | EXTI3 | EXTI4 | EXTI5 | EXTI6  | EXTI7
             | EXTI8 | EXTI9 | EXTI10 | EXTI11 | EXTI12 | EXTI13 | EXTI14  | EXTI15);
 
-    if(trigger_port == -1)
+    if(m_points[m_point].trigger_port == -1)
         return;
 
-    exti_select_source(trigger_pin, trigger_port);
-    exti_set_trigger(trigger_pin, EXTI_TRIGGER_BOTH);
-    exti_enable_request(trigger_pin);
-    gpio_mode_setup(trigger_port, GPIO_MODE_INPUT, GPIO_PUPD_NONE, trigger_pin);
+    exti_select_source(m_points[m_point].trigger_pin, m_points[m_point].trigger_port);
+    exti_set_trigger(m_points[m_point].trigger_pin, EXTI_TRIGGER_BOTH);
+    exti_enable_request(m_points[m_point].trigger_pin);
+    gpio_mode_setup(m_points[m_point].trigger_port, GPIO_MODE_INPUT, GPIO_PUPD_NONE, m_points[m_point].trigger_pin);
 
-    switch(trigger_pin)
+    switch(m_points[m_point].trigger_pin)
     {
         case 1<<0: nvic_enable_irq(NVIC_EXTI0_IRQ); break;
         case 1<<1: nvic_enable_irq(NVIC_EXTI1_IRQ); break;
@@ -187,39 +193,57 @@ void exti_setup()
     }
 }
 
-void start_measurement()
+void start_measurement(int m_point)
 {
-    running = 1;
-    head_ptr = 0;
-    tail_ptr = 0;
+    m_points[m_point].running = 1;
+    m_points[m_point].head_ptr = 0;
+    m_points[m_point].tail_ptr = 0;
 
-    a_data.energy_accum = 0;
-    a_data.elapsed_time = 0;
-    a_data.peak_power = 0;
-    a_data.peak_voltage = 0;
-    a_data.peak_current = 0;
-    a_data.n_samples = 0;
-    a_data.avg_voltage = 0;
-    a_data.avg_current = 0;
+    m_points[m_point].accum_data.energy_accum = 0;
+    m_points[m_point].accum_data.elapsed_time = 0;
+    m_points[m_point].accum_data.peak_power = 0;
+    m_points[m_point].accum_data.peak_voltage = 0;
+    m_points[m_point].accum_data.peak_current = 0;
+    m_points[m_point].accum_data.n_samples = 0;
+    m_points[m_point].accum_data.avg_voltage = 0;
+    m_points[m_point].accum_data.avg_current = 0;
 
-    tperiod = 500;
-
-    adc_power_on(ADC1);
-
-    timer_set_period(TIM2, tperiod);
-    timer_enable_counter(TIM2);
-
-    // adc_power_on(ADC2);
-    // adc_power_on(ADC3);
-    gpio_set(GPIOD, GPIO12);
+    switch(m_points[m_point].assigned_adc)
+    {
+        case 0:
+            adc_set_regular_sequence(ADC1, 1, m_points[m_point].chans);
+            adc_power_on(ADC1);
+            break;
+        case 1:
+            adc_set_regular_sequence(ADC2, 1, m_points[m_point].chans);
+            adc_power_on(ADC2);
+            break;
+        case 2:
+            adc_set_regular_sequence(ADC3, 1, m_points[m_point].chans);
+            adc_power_on(ADC3);
+            break;
+        case -1:
+            error_condition(); return;
+        default:
+            error_condition(); return;
+    }
 }
 
-void stop_measurement()
+void stop_measurement(int m_point)
 {
-    running = 0;
-    number_of_runs++;
-    timer_disable_counter(TIM2);
-    gpio_clear(GPIOD, GPIO12);
+    m_points[m_point].running = 0;
+    m_points[m_point].number_of_runs++;
+
+    switch(m_points[m_point].assigned_adc)
+    {
+        case 0: adc_off(ADC1); break;
+        case 1: adc_off(ADC2); break;
+        case 2: adc_off(ADC3); break;
+        case -1:
+            error_condition(); return;
+        default:
+            error_condition(); return;
+    }
 }
 
 static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *req, uint8_t **buf,
@@ -240,14 +264,14 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
     {
         gpio_set(GPIOD, GPIO12);
 
-        start_measurement();
+        start_measurement(req->wValue-1);
         *len = 0;
         break;
     }
     case 2:     // Stop
     {
         gpio_clear(GPIOD, GPIO12);
-        stop_measurement();
+        stop_measurement(req->wValue-1);
         *len = 0;
         break;
     }
@@ -280,51 +304,56 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
 
         switch(req->wValue)
         {
-            case 'A': trigger_port = GPIOA; break;
-            case 'B': trigger_port = GPIOB; break;
-            case 'C': trigger_port = GPIOC; break;
-            case 'D': trigger_port = GPIOD; break;
-            case 'E': trigger_port = GPIOE; break;
-            case 'F': trigger_port = GPIOF; break;
-            case 'G': trigger_port = GPIOG; break;
-            case 'H': trigger_port = GPIOH; break;
+            case 'A': m_points[0].trigger_port = GPIOA; break;
+            case 'B': m_points[0].trigger_port = GPIOB; break;
+            case 'C': m_points[0].trigger_port = GPIOC; break;
+            case 'D': m_points[0].trigger_port = GPIOD; break;
+            case 'E': m_points[0].trigger_port = GPIOE; break;
+            case 'F': m_points[0].trigger_port = GPIOF; break;
+            case 'G': m_points[0].trigger_port = GPIOG; break;
+            case 'H': m_points[0].trigger_port = GPIOH; break;
             default:
-                trigger_port = -1; break;
+                m_points[0].trigger_port = -1; break;
         }
 
-        trigger_pin = 1 << req->wIndex;
+        m_points[0].trigger_pin = 1 << req->wIndex;
 
-        if(trigger_port != GPIOA)
+        if(m_points[0].trigger_port != GPIOA)
             gpio_toggle(GPIOD, GPIO12);
 
-        exti_setup();
+        exti_setup(0);
         break;
     }
     case 6:     // Get energy
     {
         *len = sizeof(accumulated_data);
-        *buf = &a_data;
+        *buf = &m_points[req->wValue-1].accum_data;
         break;
     }
     case 7:     // Map ADC to measurement point
     {
+        int adc = req->wIndex;
+        int m_point = req->wValue - 1;
+
+        m_points[m_point].assigned_adc = adc;
+        adc_to_mpoint[adc] = m_point;
         break;
     }
     case 8:     // Is running
     {
-        *len = sizeof(running);
-        *buf = &running;
+        *len = sizeof(m_points[req->wValue-1].running);
+        *buf = &m_points[req->wValue-1].running;
         break;
     }
     case 9:     // Get number of runs
     {
-        *len = sizeof(number_of_runs);
-        *buf = &number_of_runs;
+        *len = sizeof(m_points[req->wValue-1].number_of_runs);
+        *buf = &m_points[req->wValue-1].number_of_runs;
         break;
     }
     case 10:    // Clear number of runs
     {
-        number_of_runs = 0;
+        m_points[req->wValue-1].number_of_runs = 0;
         break;
     }
     default:
@@ -343,20 +372,20 @@ static void usbdev_data_rx_cb(usbd_device *usbd_dev, uint8_t ep)
 
     for(i = 0; i < len; ++i)
     {
-        if(buf[i] == 'S')
-        {
-            running = 1;
-            head_ptr = 0;
-            tail_ptr = 0;
-            timer_enable_counter(TIM2);
-            adc_power_on(ADC1);
-        }
-        if(buf[i] == 'F')
-        {
-            running = 0;
-            timer_disable_counter(TIM2);
-            adc_off(ADC1);
-        }
+        // if(buf[i] == 'S')
+        // {
+        //     running = 1;
+        //     head_ptr = 0;
+        //     tail_ptr = 0;
+        //     timer_enable_counter(TIM2);
+        //     adc_power_on(ADC1);
+        // }
+        // if(buf[i] == 'F')
+        // {
+        //     running = 0;
+        //     timer_disable_counter(TIM2);
+        //     adc_off(ADC1);
+        // }
     }
 
     gpio_toggle(GPIOD, GPIO15);
@@ -365,7 +394,17 @@ static void usbdev_data_rx_cb(usbd_device *usbd_dev, uint8_t ep)
 
 static void usb_reset_cb()
 {
-    running = 0;
+    int i;
+
+    for(i = 0; i < 4; ++i)
+    {
+        m_points[i].running = 0;
+        m_points[i].trigger_port = -1;
+        m_points[i].trigger_pin = -1;
+        m_points[i].assigned_adc = -1;
+        m_points[i].head_ptr = 0;
+        m_points[i].tail_ptr = 0;
+    }
 }
 
 static void usbdev_set_config(usbd_device *usbd_dev, uint16_t wValue)
@@ -397,6 +436,7 @@ void timer_setup()
     timer_set_clock_division(TIM2, TIM_CR1_CKD_CK_INT);
     timer_set_master_mode(TIM2, TIM_CR2_MMS_UPDATE);
     timer_enable_preload(TIM2);
+    timer_enable_counter(TIM2);
 }
 
 void adc_setup()
@@ -414,9 +454,15 @@ void adc_setup()
 
     ADC_CCR = 0;
     ADC1_CR1 = 0;
+    ADC2_CR1 = 0;
+    ADC3_CR1 = 0;
     ADC1_CR2 = 0;
+    ADC2_CR2 = 0;
+    ADC3_CR2 = 0;
 
     adc_set_single_conversion_mode(ADC1);
+    adc_set_single_conversion_mode(ADC2);
+    adc_set_single_conversion_mode(ADC3);
 
     // Input 1
     uint8_t channels1[] = {2, 12};   // CH2 Voltage, PA2, ADC123
@@ -432,21 +478,33 @@ void adc_setup()
     // uint8_t channels1[] = {ADC_CHANNEL8};   // Voltage, PB0, ADC12
     // uint8_t channels2[] = {ADC_CHANNEL14};  // Current, PC4, ADC12
     adc_set_regular_sequence(ADC1, 1, channels1);
+    adc_set_regular_sequence(ADC2, 1, channels1);
+    adc_set_regular_sequence(ADC3, 1, channels1);
     adc_set_sample_time_on_all_channels(ADC1, ADC_SMPR_SMP_15CYC);
+    adc_set_sample_time_on_all_channels(ADC2, ADC_SMPR_SMP_15CYC);
+    adc_set_sample_time_on_all_channels(ADC3, ADC_SMPR_SMP_15CYC);
     adc_enable_external_trigger_regular(ADC1,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
+    adc_enable_external_trigger_regular(ADC2,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
+    adc_enable_external_trigger_regular(ADC3,ADC_CR2_EXTSEL_TIM2_TRGO, ADC_CR2_EXTEN_RISING_EDGE);
 
     adc_set_resolution(ADC1, ADC_CR1_RES_12BIT);
     adc_set_resolution(ADC2, ADC_CR1_RES_12BIT);
     adc_set_resolution(ADC3, ADC_CR1_RES_12BIT);
 
     adc_set_right_aligned(ADC1);
+    adc_set_right_aligned(ADC2);
+    adc_set_right_aligned(ADC3);
 
     adc_enable_overrun_interrupt(ADC1);
+    adc_enable_overrun_interrupt(ADC2);
+    adc_enable_overrun_interrupt(ADC3);
 
     adc_enable_eoc_interrupt(ADC1);
+    adc_enable_eoc_interrupt(ADC2);
+    adc_enable_eoc_interrupt(ADC3);
     adc_eoc_after_each(ADC1);
-
-    adc_power_on(ADC1);
+    adc_eoc_after_each(ADC2);
+    adc_eoc_after_each(ADC3);
 
     nvic_set_priority(NVIC_ADC_IRQ, 0xF);
     nvic_enable_irq(NVIC_ADC_IRQ);
@@ -483,7 +541,7 @@ void error_condition()
     while(1);
 }
 
-void process_buffer(power_data *pd)
+void process_buffer(power_data *pd, accumulated_data *a_data)
 {
     int i;
     unsigned pp_tot = 0, pv_tot = 0, pi_tot=0;
@@ -497,27 +555,27 @@ void process_buffer(power_data *pd)
         unsigned short v = pd->data[i];
         unsigned p = c*v;
 
-        a_data.energy_accum += p;
+        a_data->energy_accum += p;
         pp_tot += p;
         pi_tot += c;
         pv_tot += v;
 
-        a_data.n_samples += 1;
-        a_data.elapsed_time += tperiod;
-        a_data.avg_voltage += v;
-        a_data.avg_current += c;
+        a_data->n_samples += 1;
+        a_data->elapsed_time += tperiod;
+        a_data->avg_voltage += v;
+        a_data->avg_current += c;
     }
 
     pp_tot /= n_samples/2;
     pv_tot /= n_samples/2;
     pi_tot /= n_samples/2;
 
-    if(pp_tot > a_data.peak_power)
-        a_data.peak_power = pp_tot;
-    if(pv_tot > a_data.peak_voltage)
-        a_data.peak_voltage = pv_tot;
-    if(pi_tot > a_data.peak_current)
-        a_data.peak_current = pi_tot;
+    if(pp_tot > a_data->peak_power)
+        a_data->peak_power = pp_tot;
+    if(pv_tot > a_data->peak_voltage)
+        a_data->peak_voltage = pv_tot;
+    if(pi_tot > a_data->peak_current)
+        a_data->peak_current = pi_tot;
 
 }
 
@@ -525,7 +583,7 @@ int cnt=0;
 
 int main(void)
 {
-    int c_started=0, n, cpy;
+    int c_started=0, n, cpy, i, offset=0;
     short s;
 
     rcc_clock_setup_hse_3v3(&hse_8mhz_3v3[CLOCK_3V3_168MHZ]);
@@ -537,10 +595,29 @@ int main(void)
     rcc_peripheral_enable_clock(&RCC_AHB1ENR, RCC_AHB1ENR_IOPDEN);
     rcc_peripheral_enable_clock(&RCC_AHB2ENR, RCC_AHB2ENR_OTGFSEN);
 
-    // gpio_mode_setup(GPIOA, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO0);
     gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9 | GPIO11 | GPIO12);
     gpio_mode_setup(GPIOD, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO15 | GPIO14 | GPIO13 | GPIO12);
     gpio_set_af(GPIOA, GPIO_AF10, GPIO9 | GPIO11 | GPIO12);
+
+    for(i = 0;i < 4; ++i)
+    {
+        m_points[i].assigned_adc = -1;
+        m_points[i].trigger_port = -1;
+        m_points[i].trigger_pin = -1;
+    }
+
+    m_points[0].chans[0] = 2;
+    m_points[0].chans[1] = 12;
+
+    m_points[1].chans[0] = 3;
+    m_points[1].chans[1] = 1;
+
+    m_points[2].chans[0] = 9;
+    m_points[2].chans[1] = 15;
+
+    m_points[3].chans[0] = 8;
+    m_points[3].chans[1] = 14;
+
 
     // dma_setup();
     adc_setup();
@@ -553,6 +630,7 @@ int main(void)
     usbd_dev = usbd_init(&otgfs_usb_driver, &dev, &config, usb_strings, 3, control_buffer, 128);
     usbd_register_set_config_callback(usbd_dev, usbdev_set_config);
 
+    offset = 0;
     while (1)
     {
         usbd_poll(usbd_dev);
@@ -565,14 +643,21 @@ int main(void)
 
         // If we receive lots of USB commands, we might not process our
         // buffers fast enough, so lets do up to 16
-        for(n = 0; n < 16 && head_ptr != tail_ptr; ++n)
+        n = 0;
+        for(i = offset; i < 4+offset; i++)
         {
-            process_buffer(&data_bufs[head_ptr]);
+            measurement_point *mp = &m_points[i%4];
+            for(; n < 16 && mp->head_ptr != mp->tail_ptr; ++n)
+            {
+                process_buffer(&mp->data_bufs[mp->head_ptr], &mp->accum_data);
 
-            head_ptr++;
-            if(head_ptr >= NUM_BUFFERS)
-                head_ptr = 0;
+                mp->head_ptr++;
+                if(mp->head_ptr >= NUM_BUFFERS)
+                    mp->head_ptr = 0;
+            }
         }
+
+        offset = (offset + 1) % 4;
     }
 }
 
@@ -589,30 +674,32 @@ void exti15_10_isr () __attribute__ ((weak, alias ("exti_isr")));
 
 void exti_isr()
 {
-    exti_reset_request(trigger_pin);
+    int i;
 
-//    gpio_toggle(GPIOD, GPIO13);
+    for(i = 0; i < 4; ++i)
+        exti_reset_request(m_points[i].trigger_pin);
 
     if(status == -1 || 1 )
     {
-  //      gpio_toggle(GPIOD, GPIO12);
-        send_int = 1;
+        for(i = 0; i < 4; ++i)
+        {
+            if(m_points[i].trigger_port == -1 || m_points[i].trigger_pin == -1)
+                continue;
 
-        if (gpio_get(trigger_port, trigger_pin))
-        {
-            interrupt_buf[0] = 1;
-            start_measurement();
-        }
-        else
-        {
-            interrupt_buf[0] = 2;
-            stop_measurement();
+            if(gpio_get(m_points[i].trigger_port, m_points[i].trigger_pin))
+            {
+                start_measurement(i);
+            }
+            else
+            {
+                stop_measurement(i);
+            }
         }
 
         // Timeout to ignore other spurious edges
-        status = gpio_get(trigger_port, trigger_pin);
-        timer_enable_counter(TIM3);
-        timer_set_counter(TIM3, 0);
+        // status = gpio_get(trigger_port, trigger_pin);
+        // timer_enable_counter(TIM3);
+        // timer_set_counter(TIM3, 0);
     }
 }
 
@@ -630,38 +717,48 @@ void exit(int a)
 
 void adc_isr()
 {
-    if(adc_get_overrun_flag(ADC1))
-    {
-        error_condition();
-    }
-    if(adc_eoc(ADC1))
-    {
-        power_data *pd = &data_bufs[tail_ptr];
-        pd->data[pd->idx++] = ADC1_DR;
+    int m_point;
+    measurement_point *mp;
+    int adcs[3] = {ADC1, ADC2, ADC3};
+    int i;
 
-        if(pd->idx >= DMA_SHORTS)
+    for(i = 0; i < 3; ++i)
+    {
+        // if(adc_get_overrun_flag(adcs[i]))
+        //     error_condition();
+
+        if(adc_eoc(adcs[i]))
         {
-            tail_ptr = (tail_ptr + 1);
-            if(tail_ptr >= NUM_BUFFERS)
-                tail_ptr = 0;
-
-            data_bufs[tail_ptr].idx = 0;
-
-            if(tail_ptr == head_ptr)
+            m_point = adc_to_mpoint[i];
+            if(m_point == -1)
                 error_condition();
+            mp = &m_points[m_point];
+
+            power_data *pd = &mp->data_bufs[mp->tail_ptr];
+            pd->data[pd->idx++] = ADC_DR(adcs[i]);
+
+            if(pd->idx >= PWR_SAMPLES)
+            {
+                mp->tail_ptr++;
+                if(mp->tail_ptr >= NUM_BUFFERS)
+                    mp->tail_ptr = 0;
+
+                mp->data_bufs[mp->tail_ptr].idx = 0;
+
+                if(mp->tail_ptr == mp->head_ptr)
+                    error_condition();
+            }
+
+            // HACK. Here we initialise the next channel to read from
+            // because very occasionally the ADC seems to skip the next channel
+            // suspect an odd timing bug, but only happens 1/10000000 times.
+            unsigned char chan[1];
+
+            // Select odd or even channel
+            chan[0] = mp->chans[(pd->idx&1)];
+            adc_set_regular_sequence(adcs[i], 1, chan);
+
+            adc_enable_eoc_interrupt(adcs[i]);
         }
-
-        // HACK. Here we initialise the next channel to read from
-        // because very occasionally the ADC seems to skip the next channel
-        // suspect an odd timing bug, but only happens 1/10000000 times.
-        unsigned char chan[1];
-
-        if((pd->idx&1) == 0)
-            chan[0] = 2;
-        else
-            chan[0] = 12;
-        adc_set_regular_sequence(ADC1, 1, chan);
-        adc_enable_eoc_interrupt(ADC1);
     }
-
 }
