@@ -8,6 +8,8 @@ from collections import namedtuple
 
 from logging import warning, error
 
+# import multiprocessing
+
 class Measurement(object):
     def __init__(self):
         pass
@@ -55,19 +57,45 @@ class EnergyMonitor(object):
 
     # Start measuring on m_point
     def start(self, m_point=1):
+        self.clearNumberOfRuns()
         self.dev.ctrl_transfer(0x41, 1, int(m_point), 0, None)
 
     # Stop measuring on m_point
     def stop(self, m_point=1):
         self.dev.ctrl_transfer(0x41, 2, int(m_point), 0, None)
 
+    # Return whether the measurement point is currently taking
+    # measurements or not
     def isRunning(self, m_point=1):
         b = self.dev.ctrl_transfer(0xc1, 8, int(m_point), 0, 4)
 
         running = unpack("=L", b)
-        return bool(running)
+        return bool(running[0])
 
-    # Trigger
+    # This counts the number of end measurement signals caught
+    # by the energy monitor.
+    def getNumberOfRuns(self, m_point=1):
+        b = self.dev.ctrl_transfer(0xc1, 9, int(m_point), 0, 4)
+
+        runs = unpack("=L", b)
+        return bool(runs[0])
+
+    # Reset the number of runs counts to 0
+    def clearNumberOfRuns(self, m_point=1):
+        self.dev.ctrl_transfer(0x41, 10, int(m_point), 0, None)
+
+    # Have we completed a measurement?
+    def measurementCompleted(self, m_point = 1):
+        runs = self.getNumberOfRuns()
+        if runs > 1:
+            warning("More than one measurement has completed (expected one)")
+        if not self.isRunning(m_point) and runs > 0:
+            self.clearNumberOfRuns()
+            return True
+        return False
+
+    # Set a particular port as a pin trigger for a measurement point
+    #   e.g PA0
     def setTrigger(self, port, m_point=1):
 
         # TODO check port is of the form PA0
@@ -145,18 +173,13 @@ if __name__ == "__main__":
 
     em.toggleLEDs()
 
-    em.measurement_params[1]['resistor'] = 1
     # em.enableMeasurementPoint(1)
-    em.start()
-    sleep(1)
-    em.stop()
-    sleep(0.1)
-    em.getMeasurement()
-
-    sleep(1)
     em.setTrigger("PA0")
 
+    print "*** Press the blue button to make a measurement"
+
     while True:
-        print em.isRunning()
+        while not em.measurementCompleted():
+            sleep(0.1)
         em.getMeasurement()
         sleep(0.1)

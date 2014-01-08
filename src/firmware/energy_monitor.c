@@ -118,7 +118,7 @@ int tperiod=500;
 
 // Power data temporary storage /////////////////////////////////////
 
-#define NUM_BUFFERS         64
+#define NUM_BUFFERS         256
 #define DMA_SHORTS          128
 
 typedef struct {
@@ -129,6 +129,7 @@ typedef struct {
 power_data data_bufs[NUM_BUFFERS] = {0};
 
 int running = 0; // Are we collecting measurements
+int number_of_runs = 0;
 
 // Implement a circular buffer in data_bufs
 int head_ptr = 0, tail_ptr = 0;
@@ -216,6 +217,7 @@ void start_measurement()
 void stop_measurement()
 {
     running = 0;
+    number_of_runs++;
     timer_disable_counter(TIM2);
     gpio_clear(GPIOD, GPIO12);
 }
@@ -312,6 +314,17 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
     {
         *len = sizeof(running);
         *buf = &running;
+        break;
+    }
+    case 9:     // Get number of runs
+    {
+        *len = sizeof(number_of_runs);
+        *buf = &number_of_runs;
+        break;
+    }
+    case 10:    // Clear number of runs
+    {
+        number_of_runs = 0;
         break;
     }
     default:
@@ -550,7 +563,9 @@ int main(void)
             send_int = 0;
         }
 
-        if(head_ptr != tail_ptr)
+        // If we receive lots of USB commands, we might not process our
+        // buffers fast enough, so lets do up to 16
+        for(n = 0; n < 16 && head_ptr != tail_ptr; ++n)
         {
             process_buffer(&data_bufs[head_ptr]);
 
