@@ -11,17 +11,23 @@ Requirements:
 
 * libopencm3
 * summon arm toolchain (Makefile expects it at ~/sat_toolchain)
-* [stlink](https://github.com/texane/stlink) (to program the device)
+* [stlink](https://github.com/jpallister/stlink) (to program the device)
 * Boost (thread and regex)
 * LibUSB 1.0
 * libreadline
+
+For the python interface:
+
+* pyusb
+
+    $ sudo easy_install pyusb
 
 
 To build:
 
     $ make
 
-The resulting file can then be flashed to the device using st-utils and gdb.
+The resulting file can then be flashed to the device using st-util and gdb.
 
 
 Usage
