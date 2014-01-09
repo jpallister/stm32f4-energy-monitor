@@ -10,9 +10,7 @@ from logging import warning, error
 
 # import multiprocessing
 
-class Measurement(object):
-    def __init__(self):
-        pass
+Measurement = namedtuple('Measurement', 'energy time peak_power peak_voltage peak_current n_samples avg_voltage avg_current')
 
 class EnergyMonitor(object):
     MeasurementData = namedtuple('MeasurementData', 'energy_accum elapsed_time peak_power peak_voltage peak_current n_samples avg_current avg_voltage')
@@ -144,21 +142,15 @@ class EnergyMonitor(object):
         av = float(vref) / 4096. * md.avg_voltage / md.n_samples * 2
         ai = float(vref) / gain / resistor / 4096. * md.avg_current / md.n_samples
 
-        print "Peak power   (W):", pp
-        print "Peak voltage (v):", pv
-        print "Peak current (A):", pi
-        print "Energy       (J):", en
-        print "Time         (s):", el
-        print "Avg Power    (W):", en/el
-        print "Avg voltage  (V):", av
-        print "Avg current  (A):", ai
-        print md
+        m = Measurement(en, el, pp, pv, pi, md.n_samples, av, ai)
+
+        return m
 
     def getMeasurement(self, m_point=1):
         b = self.dev.ctrl_transfer(0xc1, 6, int(m_point), 0, 48)
         u = EnergyMonitor.MeasurementData._make(unpack(EnergyMonitor.MeasurementData_packing, b))
 
-        self.convertData(u, samplePeriod=self.samplePeriod, **self.measurement_params[m_point])
+        return self.convertData(u, samplePeriod=self.samplePeriod, **self.measurement_params[m_point])
 
 
     def disconnect(self):
@@ -175,24 +167,13 @@ if __name__ == "__main__":
     em.toggleLEDs()
 
     em.enableMeasurementPoint(1)
-    em.enableMeasurementPoint(2)
+    # em.enableMeasurementPoint(3)
     em.setTrigger("PA0")
 
-    # em.start(1)
-    em.start(2)
-    em.start(1)
-    sleep(1)
-    em.stop(1)
-    em.stop(2)
-    # em.stop(1)
-    em.getMeasurement(1)
-    em.getMeasurement(2)
-
-    quit()
     print "*** Press the blue button to make a measurement"
 
+    em.start(1)
     while True:
-        while not em.measurementCompleted():
-            sleep(0.1)
-        em.getMeasurement()
-        sleep(0.1)
+        m = em.getMeasurement()
+        print m.energy, m.time
+        sleep(0.05)

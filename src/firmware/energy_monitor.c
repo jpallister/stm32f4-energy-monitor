@@ -101,7 +101,7 @@ void adc_setup();
 // Power data ///////////////////////////////////////////////////////
 
 #define NUM_BUFFERS         128
-#define PWR_SAMPLES          64
+#define PWR_SAMPLES         32
 
 typedef struct {
     uint64_t energy_accum;
