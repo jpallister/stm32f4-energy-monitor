@@ -153,6 +153,8 @@ uint8_t control_buffer[128] __attribute__((aligned (16)));
 
 void exti_setup(int m_point)
 {
+    int i;
+
     nvic_disable_irq(NVIC_EXTI0_IRQ);
     nvic_disable_irq(NVIC_EXTI1_IRQ);
     nvic_disable_irq(NVIC_EXTI2_IRQ);
@@ -164,32 +166,35 @@ void exti_setup(int m_point)
     exti_reset_request(EXTI0 | EXTI1 | EXTI2 | EXTI3 | EXTI4 | EXTI5 | EXTI6  | EXTI7
             | EXTI8 | EXTI9 | EXTI10 | EXTI11 | EXTI12 | EXTI13 | EXTI14  | EXTI15);
 
-    if(m_points[m_point].trigger_port == -1)
-        return;
+    // if(m_points[m_point].trigger_port == -1)
+        // return;
 
-    exti_select_source(m_points[m_point].trigger_pin, m_points[m_point].trigger_port);
-    exti_set_trigger(m_points[m_point].trigger_pin, EXTI_TRIGGER_BOTH);
-    exti_enable_request(m_points[m_point].trigger_pin);
-    gpio_mode_setup(m_points[m_point].trigger_port, GPIO_MODE_INPUT, GPIO_PUPD_NONE, m_points[m_point].trigger_pin);
-
-    switch(m_points[m_point].trigger_pin)
+    for(i = 0; i < 4; ++i)
     {
-        case 1<<0: nvic_enable_irq(NVIC_EXTI0_IRQ); break;
-        case 1<<1: nvic_enable_irq(NVIC_EXTI1_IRQ); break;
-        case 1<<2: nvic_enable_irq(NVIC_EXTI2_IRQ); break;
-        case 1<<3: nvic_enable_irq(NVIC_EXTI3_IRQ); break;
-        case 1<<4: nvic_enable_irq(NVIC_EXTI4_IRQ); break;
-        case 1<<5:
-        case 1<<6:
-        case 1<<7:
-        case 1<<8:
-        case 1<<9: nvic_enable_irq(NVIC_EXTI9_5_IRQ); break;
-        case 1<<10:
-        case 1<<11:
-        case 1<<12:
-        case 1<<13:
-        case 1<<14:
-        case 1<<15: nvic_enable_irq(NVIC_EXTI15_10_IRQ); break;
+        exti_select_source(m_points[i].trigger_pin, m_points[i].trigger_port);
+        exti_set_trigger(m_points[i].trigger_pin, EXTI_TRIGGER_BOTH);
+        exti_enable_request(m_points[i].trigger_pin);
+        gpio_mode_setup(m_points[i].trigger_port, GPIO_MODE_INPUT, GPIO_PUPD_NONE, m_points[i].trigger_pin);
+
+        switch(m_points[i].trigger_pin)
+        {
+            case 1<<0: nvic_enable_irq(NVIC_EXTI0_IRQ); break;
+            case 1<<1: nvic_enable_irq(NVIC_EXTI1_IRQ); break;
+            case 1<<2: nvic_enable_irq(NVIC_EXTI2_IRQ); break;
+            case 1<<3: nvic_enable_irq(NVIC_EXTI3_IRQ); break;
+            case 1<<4: nvic_enable_irq(NVIC_EXTI4_IRQ); break;
+            case 1<<5:
+            case 1<<6:
+            case 1<<7:
+            case 1<<8:
+            case 1<<9: nvic_enable_irq(NVIC_EXTI9_5_IRQ); break;
+            case 1<<10:
+            case 1<<11:
+            case 1<<12:
+            case 1<<13:
+            case 1<<14:
+            case 1<<15: nvic_enable_irq(NVIC_EXTI15_10_IRQ); break;
+        }
     }
 }
 
@@ -300,28 +305,30 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
         if(*len != 0)
             return 0;
 
+        int m_point = (req->wValue >> 8) - 1;
+
         gpio_toggle(GPIOD, GPIO14);
 
-        switch(req->wValue)
+        switch(req->wValue & 0xFF)
         {
-            case 'A': m_points[0].trigger_port = GPIOA; break;
-            case 'B': m_points[0].trigger_port = GPIOB; break;
-            case 'C': m_points[0].trigger_port = GPIOC; break;
-            case 'D': m_points[0].trigger_port = GPIOD; break;
-            case 'E': m_points[0].trigger_port = GPIOE; break;
-            case 'F': m_points[0].trigger_port = GPIOF; break;
-            case 'G': m_points[0].trigger_port = GPIOG; break;
-            case 'H': m_points[0].trigger_port = GPIOH; break;
+            case 'A': m_points[m_point].trigger_port = GPIOA; break;
+            case 'B': m_points[m_point].trigger_port = GPIOB; break;
+            case 'C': m_points[m_point].trigger_port = GPIOC; break;
+            case 'D': m_points[m_point].trigger_port = GPIOD; break;
+            case 'E': m_points[m_point].trigger_port = GPIOE; break;
+            case 'F': m_points[m_point].trigger_port = GPIOF; break;
+            case 'G': m_points[m_point].trigger_port = GPIOG; break;
+            case 'H': m_points[m_point].trigger_port = GPIOH; break;
             default:
-                m_points[0].trigger_port = -1; break;
+                m_points[m_point].trigger_port = -1; break;
         }
 
-        m_points[0].trigger_pin = 1 << req->wIndex;
+        m_points[m_point].trigger_pin = 1 << (req->wIndex & 0xFF);
 
-        if(m_points[0].trigger_port != GPIOA)
+        if(m_points[m_point].trigger_port != GPIOA)
             gpio_toggle(GPIOD, GPIO12);
 
-        exti_setup(0);
+        exti_setup(m_point);
         break;
     }
     case 6:     // Get energy
@@ -688,11 +695,13 @@ void exti_isr()
 
             if(gpio_get(m_points[i].trigger_port, m_points[i].trigger_pin))
             {
+                if(!m_points[i].running)
                 start_measurement(i);
             }
             else
             {
-                stop_measurement(i);
+                if(m_points[i].running)
+                    stop_measurement(i);
             }
         }
 

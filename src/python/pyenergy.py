@@ -97,7 +97,7 @@ class EnergyMonitor(object):
     def setTrigger(self, port, m_point=1):
 
         # TODO check port is of the form PA0
-        self.dev.ctrl_transfer(0x41, 4, ord(port[1]), int(port[2]), None)
+        self.dev.ctrl_transfer(0x41, 4, ord(port[1]) | (m_point<<8), int(port[2]), None)
 
     # Enable a particular measurement point. There are
     # only 3 ADCs in the device, so only 3 measurement points
