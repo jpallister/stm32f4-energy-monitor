@@ -167,13 +167,14 @@ if __name__ == "__main__":
     em.toggleLEDs()
 
     em.enableMeasurementPoint(1)
-    # em.enableMeasurementPoint(3)
-    em.setTrigger("PA0")
+    em.enableMeasurementPoint(2)
+
+    em.setTrigger("PA0", 1)
+    em.setTrigger("PA0", 2)
 
     print "*** Press the blue button to make a measurement"
 
-    em.start(1)
     while True:
-        m = em.getMeasurement()
-        print m.energy, m.time
-        sleep(0.05)
+        while not em.measurementCompleted(): sleep(0.1)
+        print em.getMeasurement(1)
+        print em.getMeasurement(2)
