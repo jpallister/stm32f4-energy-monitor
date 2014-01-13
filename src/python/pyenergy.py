@@ -23,7 +23,7 @@ class EnergyMonitor(object):
     def __init__(self, serial="EE00"):
         # Find the usb device that corresponds to the serial number
         devs = usb.core.find(idVendor=0xf539, idProduct=0xf539,
-            find_all = True, custom_match=lambda d: d.serial_number == serial)
+            find_all = True, custom_match=lambda d: usb.util.get_string(d, 256, d.iSerialNumber) == serial)
 
         if len(devs) > 1:
             warning("More than one device available with serial " + serial)
