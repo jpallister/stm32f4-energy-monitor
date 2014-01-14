@@ -16,9 +16,14 @@ class EnergyMonitor(object):
     MeasurementData = namedtuple('MeasurementData', 'energy_accum elapsed_time peak_power peak_voltage peak_current n_samples avg_current avg_voltage')
     MeasurementData_packing = "=QQLLLLQQ"
 
+    InstantaneousData = namedtuple('InstantaneousData', 'voltage current current_time')
+    InstantaneousData_packing = "=LLL"
+
     ADC1 = 0
-    ADC2 = 0
-    ADC3 = 0
+    ADC2 = 1
+    ADC3 = 2
+
+    port_mappings = {1: ["PA2", "PC2"], 2: ["PA3", "PA1"], 3: ["PB1", "PC5"], 4:["PB0", "PC4"]}
 
     def __init__(self, serial="EE00"):
         # Find the usb device that corresponds to the serial number
@@ -152,6 +157,28 @@ class EnergyMonitor(object):
 
         return self.convertData(u, samplePeriod=self.samplePeriod, **self.measurement_params[m_point])
 
+    # get an instantaneous measurement of voltage and current (debugging)
+    def getInstantaneous(self, m_point=1):
+        b = self.dev.ctrl_transfer(0xc1, 11, int(m_point), 0, 12)
+        args = unpack(EnergyMonitor.InstantaneousData_packing, b)
+        args.append(m_point)
+        return args
+
+    # Convert and display instantaneous measurement
+    def debugInstantaneous(self, v):
+        resistor = self.measurement_params[v[3]]['resistor']
+        gain = self.measurement_params[v[3]]['gain']
+        vref = self.measurement_params[v[3]]['vref']
+
+        print "Timestamp:", v[2] * 2. / 168000000 * 2
+        print "Current:  Raw={}  Voltage@{}={}  Current={}".format(v[1],
+            EnergyMonitor.port_mappings[v[3]][1],
+            v[1]/4096.*vref,
+            float(vref) / gain / resistor / 4096. * v[1])
+        print "Voltage:  Raw={}  Voltage@{}={}  Current={}".format(v[0],
+            EnergyMonitor.port_mappings[v[3]][0],
+            v[0]/4096.*vref,
+            float(vref) / 4096. * v[0] * 2)
 
     def disconnect(self):
         pass

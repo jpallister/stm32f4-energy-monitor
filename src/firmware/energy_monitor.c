@@ -115,6 +115,12 @@ typedef struct {
 } accumulated_data;
 
 typedef struct {
+    unsigned voltage;
+    unsigned current;
+    unsigned current_time;
+} instant_data;
+
+typedef struct {
     unsigned short data[PWR_SAMPLES];
     unsigned short idx;
 } power_data;
@@ -123,6 +129,7 @@ int tperiod=500;
 
 typedef struct {
     accumulated_data accum_data;
+    instant_data id;
     power_data data_bufs[NUM_BUFFERS];
 
     int running; // Are we collecting measurements
@@ -133,6 +140,8 @@ typedef struct {
     int trigger_port, trigger_pin;
 
     int assigned_adc;
+
+    unsigned short lastI, lastV;
 
     unsigned char chans[2];
 } measurement_point;
@@ -362,6 +371,18 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
     {
         m_points[req->wValue-1].number_of_runs = 0;
         break;
+    }
+    case 11:    // Get instantaneous
+    {
+        int m_point = req->wValue - 1;
+        measurement_point *mp = &m_points[m_point];
+
+        mp->id.current = mp->lastI;
+        mp->id.voltage = mp->lastV;
+        mp->id.current_time = mp->accum_data.elapsed_time;
+
+        *len = sizeof(instant_data);
+        *buf = &m_points[req->wValue-1].id;
     }
     default:
         return 0;
@@ -738,14 +759,28 @@ void adc_isr()
 
         if(adc_eoc(adcs[i]))
         {
+            unsigned short val;
+
             m_point = adc_to_mpoint[i];
             if(m_point == -1)
                 error_condition();
+
+            // Get measurement point & buffer
             mp = &m_points[m_point];
-
             power_data *pd = &mp->data_bufs[mp->tail_ptr];
-            pd->data[pd->idx++] = ADC_DR(adcs[i]);
 
+            // Read ADC
+            val = ADC_DR(adcs[i]);
+            pd->data[pd->idx] = val;
+
+            // Save last value
+            if(pd->idx&1)
+                mp->lastI = val;
+            else
+                mp->lastV = val;
+
+            pd->idx++;
+            // Move to next buffer?
             if(pd->idx >= PWR_SAMPLES)
             {
                 mp->tail_ptr++;
