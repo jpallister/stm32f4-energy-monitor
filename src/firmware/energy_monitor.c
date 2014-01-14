@@ -383,6 +383,7 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
 
         *len = sizeof(instant_data);
         *buf = &m_points[req->wValue-1].id;
+        break;
     }
     default:
         return 0;

@@ -27,8 +27,10 @@ class EnergyMonitor(object):
 
     def __init__(self, serial="EE00"):
         # Find the usb device that corresponds to the serial number
+        #devs = usb.core.find(idVendor=0xf539, idProduct=0xf539,
+        #    find_all = True, custom_match=lambda d: usb.util.get_string(d, 256, d.iSerialNumber) == serial)
         devs = usb.core.find(idVendor=0xf539, idProduct=0xf539,
-            find_all = True, custom_match=lambda d: usb.util.get_string(d, 256, d.iSerialNumber) == serial)
+            find_all = True)
 
         if len(devs) > 1:
             warning("More than one device available with serial " + serial)
@@ -160,7 +162,7 @@ class EnergyMonitor(object):
     # get an instantaneous measurement of voltage and current (debugging)
     def getInstantaneous(self, m_point=1):
         b = self.dev.ctrl_transfer(0xc1, 11, int(m_point), 0, 12)
-        args = unpack(EnergyMonitor.InstantaneousData_packing, b)
+        args = list(unpack(EnergyMonitor.InstantaneousData_packing, b))
         args.append(m_point)
         return args
 
@@ -171,14 +173,15 @@ class EnergyMonitor(object):
         vref = self.measurement_params[v[3]]['vref']
 
         print "Timestamp:", v[2] * 2. / 168000000 * 2
-        print "Current:  Raw={}  Voltage@{}={}  Current={}".format(v[1],
+        print "Current:  Raw={:4d}  Voltage@{}={:1.5f}  Current={:1.6f}".format(v[1],
             EnergyMonitor.port_mappings[v[3]][1],
             v[1]/4096.*vref,
             float(vref) / gain / resistor / 4096. * v[1])
-        print "Voltage:  Raw={}  Voltage@{}={}  Current={}".format(v[0],
+        print "Voltage:  Raw={:4d}  Voltage@{}={:1.5f}  Voltage={:1.6f}".format(v[0],
             EnergyMonitor.port_mappings[v[3]][0],
             v[0]/4096.*vref,
             float(vref) / 4096. * v[0] * 2)
+        print ""
 
     def disconnect(self):
         pass
