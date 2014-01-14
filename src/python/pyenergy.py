@@ -173,11 +173,12 @@ class EnergyMonitor(object):
         vref = self.measurement_params[v[3]]['vref']
 
         print "Timestamp:", v[2] * 2. / 168000000 * 2
-        print "Current:  Raw={:4d}  Voltage@{}={:1.5f}  Current={:1.6f}".format(v[1],
+        print "Current:  Raw={:4d}  Voltage@{}={:1.3f}V  Res Vdrop={:1.5f}V  Current={:1.5f}A".format(v[1],
             EnergyMonitor.port_mappings[v[3]][1],
             v[1]/4096.*vref,
+            float(vref) / gain / 4096. * v[1],
             float(vref) / gain / resistor / 4096. * v[1])
-        print "Voltage:  Raw={:4d}  Voltage@{}={:1.5f}  Voltage={:1.6f}".format(v[0],
+        print "Voltage:  Raw={:4d}  Voltage@{}={:1.3f}V                      Voltage={:1.5f}V".format(v[0],
             EnergyMonitor.port_mappings[v[3]][0],
             v[0]/4096.*vref,
             float(vref) / 4096. * v[0] * 2)
