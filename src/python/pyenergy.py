@@ -99,6 +99,13 @@ class EnergyMonitor(object):
             return True
         return False
 
+    # Set the serial number
+    def setSerial(self, ser):
+        if len(ser) != 4:
+            warning("Serial should be 4 characters.")
+            ser = (ser + "0000")[:4]
+        self.dev.ctrl_transfer(0x41, 3, ord(ser[0]) | (ord(ser[1])<<8), ord(ser[2]) | (ord(ser[3])<<8), None)
+
     # Set a particular port as a pin trigger for a measurement point
     #   e.g PA0
     def setTrigger(self, port, m_point=1):
