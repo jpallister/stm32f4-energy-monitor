@@ -663,22 +663,6 @@ int main(void)
     while (1)
     {
         usbd_poll(usbd_dev);
-
-        // If we receive lots of USB commands, we might not process our
-        // buffers fast enough, so lets do up to 16
-        // for(i = 0; i < 4; i++)
-        // {
-        //     measurement_point *mp = &m_points[i];
-
-        //     if(mp->head_ptr != mp->tail_ptr)
-        //     {
-        //         process_buffer(&mp->data_bufs[mp->head_ptr], &mp->accum_data);
-
-        //         mp->head_ptr++;
-        //         if(mp->head_ptr >= NUM_BUFFERS)
-        //             mp->head_ptr = 0;
-        //     }
-        // }
     }
 }
 
@@ -795,20 +779,6 @@ void adc_isr()
             }
 
             pd->idx = 1-pd->idx;
-
-            // pd->idx++;
-            // // Move to next buffer?
-            // if(pd->idx >= PWR_SAMPLES)
-            // {
-            //     mp->tail_ptr++;
-            //     if(mp->tail_ptr >= NUM_BUFFERS)
-            //         mp->tail_ptr = 0;
-
-            //     mp->data_bufs[mp->tail_ptr].idx = 0;
-
-            //     if(mp->tail_ptr == mp->head_ptr)
-            //         error_condition();
-            // }
 
             // HACK. Here we initialise the next channel to read from
             // because very occasionally the ADC seems to skip the next channel
