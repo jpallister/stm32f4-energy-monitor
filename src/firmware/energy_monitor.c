@@ -97,6 +97,7 @@ static const char *usb_strings[] = {
 
 void dma_setup();
 void adc_setup();
+void error_condition();
 
 // Power data ///////////////////////////////////////////////////////
 
@@ -343,7 +344,7 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
     case 6:     // Get energy
     {
         *len = sizeof(accumulated_data);
-        *buf = &m_points[req->wValue-1].accum_data;
+        *buf = (uint8_t*)&m_points[req->wValue-1].accum_data;
         break;
     }
     case 7:     // Map ADC to measurement point
@@ -358,13 +359,13 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
     case 8:     // Is running
     {
         *len = sizeof(m_points[req->wValue-1].running);
-        *buf = &m_points[req->wValue-1].running;
+        *buf = (uint8_t*)&m_points[req->wValue-1].running;
         break;
     }
     case 9:     // Get number of runs
     {
         *len = sizeof(m_points[req->wValue-1].number_of_runs);
-        *buf = &m_points[req->wValue-1].number_of_runs;
+        *buf = (uint8_t*)&m_points[req->wValue-1].number_of_runs;
         break;
     }
     case 10:    // Clear number of runs
@@ -382,7 +383,7 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
         mp->id.current_time = mp->accum_data.elapsed_time;
 
         *len = sizeof(instant_data);
-        *buf = &m_points[req->wValue-1].id;
+        *buf = (uint8_t*)&m_points[req->wValue-1].id;
         break;
     }
     default:
