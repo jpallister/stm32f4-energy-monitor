@@ -27,7 +27,7 @@ while True:
     # m2 = em.getInstantaneous(2)
     # m3 = em.getInstantaneous(3)
 
-    print m, m3
+    print m
 
     print m[1] * float(vref)**2 / gain / resistor / 4096**2 * 2
     ydata.append(m[1] * float(vref)**2 / gain / resistor / 4096**2 * 2*1000)
