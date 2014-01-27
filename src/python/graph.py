@@ -29,11 +29,11 @@ while True:
 
     print m
 
-    print m[1] * float(vref)**2 / gain / resistor / 4096**2 * 2
-    ydata.append(m[1] * float(vref)**2 / gain / resistor / 4096**2 * 2*1000)
+    print m[3] * float(vref)**2 / gain / resistor / 4096**2 * 2
+    ydata.append(m[3] * float(vref)**2 / gain / resistor / 4096**2 * 2*1000)
     # ydata2.append(m2[1] * float(vref)**2 / gain / resistor / 4096**2 * 2)
     # ydata3.append(m3[1] * float(vref)**2 / gain / resistor / 4096**2 * 2*1000)
-    xdata.append(m[2] / 168000000. * 2)
+    xdata.append(m[4] / 168000000. * 2)
     # em.debugInstantaneous(m)
 
     fig.clf()

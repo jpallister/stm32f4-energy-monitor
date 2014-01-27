@@ -101,8 +101,8 @@ void error_condition();
 
 // Power data ///////////////////////////////////////////////////////
 
-#define NUM_BUFFERS         128
-#define PWR_SAMPLES         32
+#define INSTANT_AVG_BITS    5
+#define INSTANT_AVG_NUM     (1<<INSTANT_AVG_BITS)
 
 typedef struct {
     uint64_t energy_accum;
@@ -118,21 +118,19 @@ typedef struct {
 typedef struct {
     unsigned voltage;
     unsigned current;
+    unsigned average_voltage;
+    unsigned average_current;
     unsigned current_time;
 } instant_data;
-
-typedef struct {
-    unsigned short data[PWR_SAMPLES];
-    unsigned short idx;
-} power_data;
 
 int tperiod=500;
 
 typedef struct {
     accumulated_data accum_data;
     instant_data id;
-    power_data data_bufs[NUM_BUFFERS];
 
+
+    int idx;
     int running; // Are we collecting measurements
     int number_of_runs;
 
@@ -143,6 +141,9 @@ typedef struct {
     int assigned_adc;
 
     unsigned short lastI, lastV;
+
+    unsigned short avgI[INSTANT_AVG_NUM], avgV[INSTANT_AVG_NUM];
+    unsigned short avg_ptr;
 
     unsigned char chans[2];
 } measurement_point;
@@ -376,10 +377,21 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
     case 11:    // Get instantaneous
     {
         int m_point = req->wValue - 1;
+        int tot_current = 0, tot_voltage = 0, i;
         measurement_point *mp = &m_points[m_point];
 
         mp->id.current = mp->lastI;
         mp->id.voltage = mp->lastV;
+
+        for(i = 0; i < INSTANT_AVG_NUM; ++i)
+        {
+            tot_current += mp->avgI[i];
+            tot_voltage += mp->avgV[i];
+        }
+
+        mp->id.average_current = tot_current >> INSTANT_AVG_BITS;
+        mp->id.average_voltage = tot_voltage >> INSTANT_AVG_BITS;
+
         mp->id.current_time = mp->accum_data.elapsed_time;
 
         *len = sizeof(instant_data);
@@ -565,49 +577,59 @@ void exti_timer_setup()
     nvic_set_priority(NVIC_EXTI15_10_IRQ, 0x40);
 }
 
+static void systick_setup(void)
+{
+    systick_set_reload(16800);
+    systick_set_clocksource(STK_CSR_CLKSOURCE_AHB);
+    systick_counter_enable();
+
+    nvic_set_priority(NVIC_SYSTICK_IRQ, 0x80);
+    systick_interrupt_enable();
+}
+
 void error_condition()
 {
     gpio_set(GPIOD, GPIO15);
     while(1);
 }
 
-void process_buffer(power_data *pd, accumulated_data *a_data)
-{
-    int i;
-    unsigned pp_tot = 0, pv_tot = 0, pi_tot=0;
+// void process_buffer(power_data *pd, accumulated_data *a_data)
+// {
+//     int i;
+//     unsigned pp_tot = 0, pv_tot = 0, pi_tot=0;
 
-    // Subtract 1 incase we have an unpaired sample at the end
-    unsigned short n_samples = pd->idx - 1;
+//     // Subtract 1 incase we have an unpaired sample at the end
+//     unsigned short n_samples = pd->idx - 1;
 
-    for(i = 0; i < n_samples; i+=2)
-    {
-        unsigned short c = pd->data[i+1];
-        unsigned short v = pd->data[i];
-        unsigned p = c*v;
+//     for(i = 0; i < n_samples; i+=2)
+//     {
+//         unsigned short c = pd->data[i+1];
+//         unsigned short v = pd->data[i];
+//         unsigned p = c*v;
 
-        a_data->energy_accum += p;
-        pp_tot += p;
-        pi_tot += c;
-        pv_tot += v;
+//         a_data->energy_accum += p;
+//         pp_tot += p;
+//         pi_tot += c;
+//         pv_tot += v;
 
-        a_data->n_samples += 1;
-        a_data->elapsed_time += tperiod;
-        a_data->avg_voltage += v;
-        a_data->avg_current += c;
-    }
+//         a_data->n_samples += 1;
+//         a_data->elapsed_time += tperiod;
+//         a_data->avg_voltage += v;
+//         a_data->avg_current += c;
+//     }
 
-    pp_tot /= n_samples/2;
-    pv_tot /= n_samples/2;
-    pi_tot /= n_samples/2;
+//     pp_tot /= n_samples/2;
+//     pv_tot /= n_samples/2;
+//     pi_tot /= n_samples/2;
 
-    if(pp_tot > a_data->peak_power)
-        a_data->peak_power = pp_tot;
-    if(pv_tot > a_data->peak_voltage)
-        a_data->peak_voltage = pv_tot;
-    if(pi_tot > a_data->peak_current)
-        a_data->peak_current = pi_tot;
+//     if(pp_tot > a_data->peak_power)
+//         a_data->peak_power = pp_tot;
+//     if(pv_tot > a_data->peak_voltage)
+//         a_data->peak_voltage = pv_tot;
+//     if(pi_tot > a_data->peak_current)
+//         a_data->peak_current = pi_tot;
 
-}
+// }
 
 int cnt=0;
 
@@ -745,23 +767,28 @@ void adc_isr()
 
             // Get measurement point & buffer
             mp = &m_points[m_point];
-            power_data *pd = &mp->data_bufs[mp->tail_ptr];
 
             // Read ADC
             val = ADC_DR(adcs[i]);
-            pd->data[pd->idx] = val;
 
             // Save last value
-            if(pd->idx&1)
+            if(mp->idx&1)
+            {
                 mp->lastI = val;
+                mp->avgI[mp->avg_ptr] = val;
+                mp->avg_ptr = (mp->avg_ptr + 1) & (INSTANT_AVG_NUM - 1);
+            }
             else
+            {
                 mp->lastV = val;
+                mp->avgV[mp->avg_ptr] = val;
+            }
 
-            if((pd->idx & 1) == 1)
+            if((mp->idx & 1) == 1)
             {
                 accumulated_data *a_data = &mp->accum_data;
-                unsigned short c = pd->data[1];
-                unsigned short v = pd->data[0];
+                unsigned short c = mp->lastI;
+                unsigned short v = mp->lastV;
                 unsigned p = c*v;
 
                 a_data->energy_accum += p;
@@ -779,7 +806,7 @@ void adc_isr()
                     a_data->peak_current = c;
             }
 
-            pd->idx = 1-pd->idx;
+            mp->idx = 1-mp->idx;
 
             // HACK. Here we initialise the next channel to read from
             // because very occasionally the ADC seems to skip the next channel
@@ -787,7 +814,7 @@ void adc_isr()
             unsigned char chan[1];
 
             // Select odd or even channel
-            chan[0] = mp->chans[(pd->idx&1)];
+            chan[0] = mp->chans[(mp->idx&1)];
             adc_set_regular_sequence(adcs[i], 1, chan);
 
             adc_enable_eoc_interrupt(adcs[i]);

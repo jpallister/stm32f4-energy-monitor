@@ -4,14 +4,31 @@
 
 import pyenergy
 from time import sleep
+import sys
+
+m_points = []
+
+for arg in sys.argv[1:]:
+    try:
+        m = int(arg)
+        if m < 1 or m > 4:
+            print "Expected measurement point in range 1-4"
+            continue
+        m_points.append(m)
+    except TypeError:
+        print "Expected integer measurement point number, got:",arg
 
 em = pyenergy.EnergyMonitor("EE00")
 em.connect()
 
-em.enableMeasurementPoint(1)
-em.start()
+for m in m_points:
+    em.enableMeasurementPoint(m)
+    em.start(m)
 
 while True:
-    m = em.getInstantaneous()
-    em.debugInstantaneous(m)
+    for m in m_points:
+        meas = em.getInstantaneous(m)
+        print "Measurement point:", m
+        em.debugInstantaneous(meas)
+    print ""
     sleep(0.1)

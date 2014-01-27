@@ -16,8 +16,8 @@ class EnergyMonitor(object):
     MeasurementData = namedtuple('MeasurementData', 'energy_accum elapsed_time peak_power peak_voltage peak_current n_samples avg_current avg_voltage')
     MeasurementData_packing = "=QQLLLLQQ"
 
-    InstantaneousData = namedtuple('InstantaneousData', 'voltage current current_time')
-    InstantaneousData_packing = "=LLL"
+    InstantaneousData = namedtuple('InstantaneousData', 'voltage current average_voltage average_current current_time')
+    InstantaneousData_packing = "=LLLLL"
 
     ADC1 = 0
     ADC2 = 1
@@ -161,34 +161,35 @@ class EnergyMonitor(object):
         return m
 
     def getMeasurement(self, m_point=1):
-        b = self.dev.ctrl_transfer(0xc1, 6, int(m_point), 0, 48)
+        b = self.dev.ctrl_transfer(0xc1, 6, int(m_point), 0, calcsize(EnergyMonitor.MeasurementData_packing))
         u = EnergyMonitor.MeasurementData._make(unpack(EnergyMonitor.MeasurementData_packing, b))
 
         return self.convertData(u, samplePeriod=self.samplePeriod, **self.measurement_params[m_point])
 
     # get an instantaneous measurement of voltage and current (debugging)
     def getInstantaneous(self, m_point=1):
-        b = self.dev.ctrl_transfer(0xc1, 11, int(m_point), 0, 12)
+        b = self.dev.ctrl_transfer(0xc1, 11, int(m_point), 0, calcsize(EnergyMonitor.InstantaneousData_packing))
         args = list(unpack(EnergyMonitor.InstantaneousData_packing, b))
         args.append(m_point)
         return args
 
     # Convert and display instantaneous measurement
     def debugInstantaneous(self, v):
-        resistor = self.measurement_params[v[3]]['resistor']
-        gain = self.measurement_params[v[3]]['gain']
-        vref = self.measurement_params[v[3]]['vref']
+        mp = v[5]
+        resistor = self.measurement_params[mp]['resistor']
+        gain = self.measurement_params[mp]['gain']
+        vref = self.measurement_params[mp]['vref']
 
-        print "Timestamp:", v[2] * 2. / 168000000 * 2
-        print "Current:  Raw={:4d}  Voltage@{}={:1.3f}V  Res Vdrop={:1.5f}V  Current={:1.5f}A".format(v[1],
-            EnergyMonitor.port_mappings[v[3]][1],
-            v[1]/4096.*vref,
-            float(vref) / gain / 4096. * v[1],
-            float(vref) / gain / resistor / 4096. * v[1])
-        print "Voltage:  Raw={:4d}  Voltage@{}={:1.3f}V                      Voltage={:1.5f}V".format(v[0],
-            EnergyMonitor.port_mappings[v[3]][0],
-            v[0]/4096.*vref,
-            float(vref) / 4096. * v[0] * 2)
+        print "Timestamp:", v[4] * 2. / 168000000 * 2
+        print "Current:  Raw={:4d}  Voltage@{}={:1.3f}V  Res Vdrop={:1.5f}V  Current={:1.5f}A".format(mp,
+            EnergyMonitor.port_mappings[mp][1],
+            v[3]/4096.*vref,
+            float(vref) / gain / 4096. * v[3],
+            float(vref) / gain / resistor / 4096. * v[3])
+        print "Voltage:  Raw={:4d}  Voltage@{}={:1.3f}V                      Voltage={:1.5f}V".format(v[2],
+            EnergyMonitor.port_mappings[mp][0],
+            v[2]/4096.*vref,
+            float(vref) / 4096. * v[2] * 2)
         print ""
 
     def disconnect(self):
