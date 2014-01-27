@@ -535,7 +535,7 @@ void adc_setup()
     adc_eoc_after_each(ADC2);
     adc_eoc_after_each(ADC3);
 
-    nvic_set_priority(NVIC_ADC_IRQ, 0xF);
+    nvic_set_priority(NVIC_ADC_IRQ, 0x10);
     nvic_enable_irq(NVIC_ADC_IRQ);
 }
 
@@ -552,16 +552,16 @@ void exti_timer_setup()
     timer_set_master_mode(TIM3, TIM_CR2_MMS_UPDATE);
     timer_enable_irq(TIM3, TIM_DIER_UIE);
 
-    nvic_set_priority(NVIC_TIM3_IRQ, 10);
+    nvic_set_priority(NVIC_TIM3_IRQ, 0x30);
     nvic_enable_irq(NVIC_TIM3_IRQ);
 
-    nvic_set_priority(NVIC_EXTI0_IRQ, 9);
-    nvic_set_priority(NVIC_EXTI1_IRQ, 9);
-    nvic_set_priority(NVIC_EXTI2_IRQ, 9);
-    nvic_set_priority(NVIC_EXTI3_IRQ, 9);
-    nvic_set_priority(NVIC_EXTI4_IRQ, 9);
-    nvic_set_priority(NVIC_EXTI9_5_IRQ, 9);
-    nvic_set_priority(NVIC_EXTI15_10_IRQ, 9);
+    nvic_set_priority(NVIC_EXTI0_IRQ, 0x40);
+    nvic_set_priority(NVIC_EXTI1_IRQ, 0x40);
+    nvic_set_priority(NVIC_EXTI2_IRQ, 0x40);
+    nvic_set_priority(NVIC_EXTI3_IRQ, 0x40);
+    nvic_set_priority(NVIC_EXTI4_IRQ, 0x40);
+    nvic_set_priority(NVIC_EXTI9_5_IRQ, 0x40);
+    nvic_set_priority(NVIC_EXTI15_10_IRQ, 0x40);
 }
 
 void error_condition()
@@ -664,29 +664,21 @@ int main(void)
     {
         usbd_poll(usbd_dev);
 
-        if(send_int)
-        {
-            // usbd_ep_write_packet(usbd_dev, 0x82, interrupt_buf, 4);
-            send_int = 0;
-        }
-
         // If we receive lots of USB commands, we might not process our
         // buffers fast enough, so lets do up to 16
-        n = 0;
-        for(i = offset; i < 4+offset; i++)
-        {
-            measurement_point *mp = &m_points[i%4];
-            for(; n < 16 && mp->head_ptr != mp->tail_ptr; ++n)
-            {
-                process_buffer(&mp->data_bufs[mp->head_ptr], &mp->accum_data);
+        // for(i = 0; i < 4; i++)
+        // {
+        //     measurement_point *mp = &m_points[i];
 
-                mp->head_ptr++;
-                if(mp->head_ptr >= NUM_BUFFERS)
-                    mp->head_ptr = 0;
-            }
-        }
+        //     if(mp->head_ptr != mp->tail_ptr)
+        //     {
+        //         process_buffer(&mp->data_bufs[mp->head_ptr], &mp->accum_data);
 
-        offset = (offset + 1) % 4;
+        //         mp->head_ptr++;
+        //         if(mp->head_ptr >= NUM_BUFFERS)
+        //             mp->head_ptr = 0;
+        //     }
+        // }
     }
 }
 
@@ -755,8 +747,8 @@ void adc_isr()
 
     for(i = 0; i < 3; ++i)
     {
-        // if(adc_get_overrun_flag(adcs[i]))
-        //     error_condition();
+        if(adc_get_overrun_flag(adcs[i]))
+            error_condition();
 
         if(adc_eoc(adcs[i]))
         {
@@ -780,19 +772,43 @@ void adc_isr()
             else
                 mp->lastV = val;
 
-            pd->idx++;
-            // Move to next buffer?
-            if(pd->idx >= PWR_SAMPLES)
+            if((pd->idx & 1) == 1)
             {
-                mp->tail_ptr++;
-                if(mp->tail_ptr >= NUM_BUFFERS)
-                    mp->tail_ptr = 0;
+                accumulated_data *a_data = &mp->accum_data;
+                unsigned short c = pd->data[1];
+                unsigned short v = pd->data[0];
+                unsigned p = c*v;
 
-                mp->data_bufs[mp->tail_ptr].idx = 0;
+                a_data->energy_accum += p;
 
-                if(mp->tail_ptr == mp->head_ptr)
-                    error_condition();
+                a_data->n_samples += 1;
+                a_data->elapsed_time += tperiod;
+                a_data->avg_voltage += v;
+                a_data->avg_current += c;
+
+                if(p > a_data->peak_power)
+                    a_data->peak_power = p;
+                if(v > a_data->peak_voltage)
+                    a_data->peak_voltage = v;
+                if(c > a_data->peak_current)
+                    a_data->peak_current = c;
             }
+
+            pd->idx = 1-pd->idx;
+
+            // pd->idx++;
+            // // Move to next buffer?
+            // if(pd->idx >= PWR_SAMPLES)
+            // {
+            //     mp->tail_ptr++;
+            //     if(mp->tail_ptr >= NUM_BUFFERS)
+            //         mp->tail_ptr = 0;
+
+            //     mp->data_bufs[mp->tail_ptr].idx = 0;
+
+            //     if(mp->tail_ptr == mp->head_ptr)
+            //         error_condition();
+            // }
 
             // HACK. Here we initialise the next channel to read from
             // because very occasionally the ADC seems to skip the next channel
