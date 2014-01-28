@@ -17,7 +17,7 @@ class EnergyMonitor(object):
     MeasurementData_packing = "=QQLLLLQQ"
 
     InstantaneousData = namedtuple('InstantaneousData', 'voltage current average_voltage average_current current_time')
-    InstantaneousData_packing = "=LLLLL"
+    InstantaneousData_packing = "=LLLLQ"
 
     ADC1 = 0
     ADC2 = 1
