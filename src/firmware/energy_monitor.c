@@ -120,7 +120,7 @@ typedef struct {
     unsigned current;
     unsigned average_voltage;
     unsigned average_current;
-    unsigned current_time;
+    uint64_t current_time;
 } instant_data;
 
 int tperiod=500;
@@ -575,16 +575,6 @@ void exti_timer_setup()
     nvic_set_priority(NVIC_EXTI4_IRQ, 0x40);
     nvic_set_priority(NVIC_EXTI9_5_IRQ, 0x40);
     nvic_set_priority(NVIC_EXTI15_10_IRQ, 0x40);
-}
-
-static void systick_setup(void)
-{
-    systick_set_reload(16800);
-    systick_set_clocksource(STK_CSR_CLKSOURCE_AHB);
-    systick_counter_enable();
-
-    nvic_set_priority(NVIC_SYSTICK_IRQ, 0x80);
-    systick_interrupt_enable();
 }
 
 void error_condition()
