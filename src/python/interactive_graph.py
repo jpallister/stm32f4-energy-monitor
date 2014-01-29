@@ -10,14 +10,18 @@ from mpl_toolkits.axes_grid.parasite_axes import SubplotHost
 
 import collections
 
+import pyenergy
+
 class Graph(QMainWindow):
-    def __init__(self, parent=None):
+    def __init__(self, em, parent=None):
         QMainWindow.__init__(self, parent)
         self.setWindowTitle('Energy monitoring graph')
 
-        self.tinterval = 0.1
+        self.em = em
+
+        self.tinterval = 0.01
         self.ctime = 0
-        self.wsize = 100
+        self.wsize = 1000
 
         self.create_main()
         self.setUpdate()
@@ -108,8 +112,8 @@ class Graph(QMainWindow):
         grid.addWidget(QLabel("Interval (s)"), 1, 0)
         self.timeslider = QSlider(1)
         self.timeslider.setMinimum(1)
-        self.timeslider.setMaximum(200)
-        self.timeslider.setValue(20)
+        self.timeslider.setMaximum(2000)
+        self.timeslider.setValue(self.tinterval*1000)
         self.timeslider.setTickInterval(1)
         self.timeslider.setSingleStep(1)
         self.connect(self.timeslider, SIGNAL('valueChanged(int)'), self.updatesliders)
@@ -118,9 +122,9 @@ class Graph(QMainWindow):
         # Add window slider
         grid.addWidget(QLabel("Window size"), 3, 0)
         self.windowslider = QSlider(1)
-        self.windowslider.setMinimum(2)
-        self.windowslider.setMaximum(100)
-        self.windowslider.setValue(40)
+        self.windowslider.setMinimum(20)
+        self.windowslider.setMaximum(2000)
+        self.windowslider.setValue(self.wsize)
         self.windowslider.setTickInterval(1)
         self.windowslider.setSingleStep(1)
         self.connect(self.windowslider, SIGNAL('valueChanged(int)'), self.updatesliders)
@@ -187,6 +191,7 @@ class Graph(QMainWindow):
     def updatesliders(self):
         self.tinterval = self.timeslider.value() / 100.
         self.wsize = self.windowslider.value()
+        print self.tinterval, self.wsize
         self.setUpdate()
         print self.tinterval
 
@@ -217,9 +222,9 @@ class Graph(QMainWindow):
             p.remove()
         self.plots = []
 
-        for mp, vals in self.data.items():
+        for i,(mp, vals) in enumerate(sorted(self.data.items())):
             if self.state[mp][1]:
-                p1,  = self.axes.plot(vals["xdata"], vals["idata"], 'g')
+                p1,  = self.axes.plot(vals["xdata"], vals["idata"], ["-*", "-+", "-s", "-"][i], color='g')
                 self.plots.append(p1)
                 maxis.append(max(vals["idata"]))
                 minis.append(min(vals["idata"]))
@@ -306,31 +311,45 @@ class Graph(QMainWindow):
 
         self.ctime += self.tinterval
 
+        tset = None
+
         for i, mp in enumerate(sorted(state.keys())):
-            #self.em.measurement_params[i+1]['resistor'] = [0.05, 0.5, 1.0, 5.0][state[mp][0]]
+            self.em.measurement_params[i+1]['resistor'] = [0.05, 0.5, 1.0, 5.0][state[mp][0]]
 
             # Check we need to enable or disable a measurement point
             if bool(sum(state[mp][1:])) != bool(sum(self.state[mp][1:])):
                 if bool(sum(state[mp][1:])):
-                    #self.em.enableMeasurementPoint(i+1)
-                    #self.em.start(i+1)
+                    self.em.enableMeasurementPoint(i+1)
+                    self.em.start(i+1)
                     print "Enable", mp
                 else:
-                    #self.em.stop(i+1)
-                    #self.em.disableMeasurementPoint(i+1)
+                    self.em.stop(i+1)
+                    self.em.disableMeasurementPoint(i+1)
                     print "Disable", mp
 
             if bool(sum(state[mp][1:])):
-                # m = self.em.getMeasurement(i+1)
-                # v = m.average_voltage
-                # c = m.average_current
-                # p = v * c
-                # t = m.elapsed_time
+                res = self.em.measurement_params[i+1]['resistor']
+                vref = self.em.measurement_params[i+1]['vref']
+                gain = self.em.measurement_params[i+1]['gain']
 
-                v = 3 + random.randint(0,100)/300.0
-                c = 0.01 + random.randint(0,100)/1000.0
+                # m = self.em.getMeasurement(i+1)
+                m = self.em.getInstantaneous(i+1)
+                v = m[2]#.average_voltage
+
+                v = float(vref) / 4096. * m[2] * 2
+                c = float(vref) / gain / res / 4096. * m[3]
                 p = v * c
-                t = self.ctime
+                t = m[4] * 2. / 168000000 * 2 #m.elapsed_time
+
+                # v = 3 + random.randint(0,100)/300.0
+                # c = 0.01 + random.randint(0,100)/1000.0
+                # p = v * c
+                # t = self.ctime
+
+                if tset is None:
+                    tset = t
+
+                t = tset
 
                 self.data[mp]['xdata'].append(t)
                 self.data[mp]['idata'].append(c)
@@ -348,7 +367,11 @@ class Graph(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     app.setStyle("plastique")
-    form = Graph()
+
+    em = pyenergy.EnergyMonitor("EE00")
+    em.connect()
+
+    form = Graph(em)
     form.show()
     app.exec_()
 
