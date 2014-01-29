@@ -21,7 +21,9 @@ class Graph(QMainWindow):
 
         self.tinterval = 0.01
         self.ctime = 0
-        self.wsize = 1000
+        self.wsize = 500
+        self.toffset = 0
+        self.tref = None
 
         self.create_main()
         self.setUpdate()
@@ -154,7 +156,11 @@ class Graph(QMainWindow):
 
             combo = QComboBox()
             combo.addItems(["0.05", "0.5", "1", "5"])
-            combo.setCurrentIndex(2)
+            if mp == "Self":
+                combo.setCurrentIndex(1)
+                combo.setEnabled(False)
+            else:
+                combo.setCurrentIndex(2)
             self.controls[mp].append(combo)
             grid.addWidget(QLabel("Resistor"), 1, 0)
             grid.addWidget(combo, 1, 1, alignment=Qt.AlignCenter)
@@ -189,7 +195,7 @@ class Graph(QMainWindow):
         self.setCentralWidget(self.main_frame)
 
     def updatesliders(self):
-        self.tinterval = self.timeslider.value() / 100.
+        self.tinterval = self.timeslider.value() / 1000.
         self.wsize = self.windowslider.value()
         print self.tinterval, self.wsize
         self.setUpdate()
@@ -222,19 +228,32 @@ class Graph(QMainWindow):
             p.remove()
         self.plots = []
 
+        n_points = [0,0,0]
+
+        for s in self.state.values():
+            n_points[0] += s[1]
+            n_points[1] += s[2]
+            n_points[2] += s[3]
+
+
+        linestyles = [["-","-","-","-"], ["-","-","-","-"], ["-","-","-","-"]]
+        for i in range(3):
+            if n_points[i] > 1:
+                linestyles[i] = ["-*", "-+", "-s", "-"]
+
         for i,(mp, vals) in enumerate(sorted(self.data.items())):
             if self.state[mp][1]:
-                p1,  = self.axes.plot(vals["xdata"], vals["idata"], ["-*", "-+", "-s", "-"][i], color='g')
+                p1,  = self.axes.plot(vals["xdata"], vals["idata"], linestyles[0][i], color='g')
                 self.plots.append(p1)
                 maxis.append(max(vals["idata"]))
                 minis.append(min(vals["idata"]))
             if self.state[mp][2]:
-                p1,  = self.vaxes.plot(vals["xdata"], vals["vdata"], 'b')
+                p1,  = self.vaxes.plot(vals["xdata"], vals["vdata"], linestyles[1][i], color='b')
                 self.plots.append(p1)
                 maxvs.append(max(vals["vdata"]))
                 minvs.append(min(vals["vdata"]))
             if self.state[mp][3]:
-                p1,  = self.paxes.plot(vals["xdata"], vals["pdata"], 'r')
+                p1,  = self.paxes.plot(vals["xdata"], vals["pdata"], linestyles[2][i], color='r')
                 self.plots.append(p1)
                 maxps.append(max(vals["pdata"]))
                 minps.append(min(vals["pdata"]))
@@ -302,7 +321,7 @@ class Graph(QMainWindow):
                 if i == 0:
                     state[mp].append(control.currentIndex())
                 else:
-                    state[mp].append(control.checkState())
+                    state[mp].append(control.checkState() == 2)
         return state
 
 
@@ -311,45 +330,60 @@ class Graph(QMainWindow):
 
         self.ctime += self.tinterval
 
-        tset = None
+        disabled_tref = None
+        measurements = {}
+        first_on = None
 
         for i, mp in enumerate(sorted(state.keys())):
             self.em.measurement_params[i+1]['resistor'] = [0.05, 0.5, 1.0, 5.0][state[mp][0]]
+            stateChange = False
 
             # Check we need to enable or disable a measurement point
             if bool(sum(state[mp][1:])) != bool(sum(self.state[mp][1:])):
+                stateChange = True
                 if bool(sum(state[mp][1:])):
                     self.em.enableMeasurementPoint(i+1)
                     self.em.start(i+1)
-                    print "Enable", mp
+
+                    self.data[mp]['xdata'] = []
+                    self.data[mp]['idata'] = []
+                    self.data[mp]['vdata'] = []
+                    self.data[mp]['pdata'] = []
                 else:
                     self.em.stop(i+1)
                     self.em.disableMeasurementPoint(i+1)
-                    print "Disable", mp
+                    if mp == self.tref:
+                        disabled_tref = mp
 
-            if bool(sum(state[mp][1:])):
-                res = self.em.measurement_params[i+1]['resistor']
-                vref = self.em.measurement_params[i+1]['vref']
-                gain = self.em.measurement_params[i+1]['gain']
-
-                # m = self.em.getMeasurement(i+1)
+            if bool(sum(state[mp][1:])) or stateChange:
                 m = self.em.getInstantaneous(i+1)
-                v = m[2]#.average_voltage
+                measurements[mp] = m
+
+                if first_on is None and mp != disabled_tref:
+                    first_on = mp
+
+        if self.tref is None:
+            self.tref = first_on
+
+        if disabled_tref is not None:
+            self.toffset += (measurements[self.tref][4] - measurements[first_on][4]) * 2. / 168000000*2.
+            self.tref = first_on
+
+        if self.tref is not None:
+            base_t = measurements[self.tref][4]* 2. / 168000000*2. + self.toffset
+
+        for mp, m in measurements.items():
+                i = {"1": 1, "2":2, "3":3, "Self":4}[mp]
+                res = self.em.measurement_params[i]['resistor']
+                vref = self.em.measurement_params[i]['vref']
+                gain = self.em.measurement_params[i]['gain']
+                print res, mp, i
 
                 v = float(vref) / 4096. * m[2] * 2
                 c = float(vref) / gain / res / 4096. * m[3]
                 p = v * c
-                t = m[4] * 2. / 168000000 * 2 #m.elapsed_time
 
-                # v = 3 + random.randint(0,100)/300.0
-                # c = 0.01 + random.randint(0,100)/1000.0
-                # p = v * c
-                # t = self.ctime
-
-                if tset is None:
-                    tset = t
-
-                t = tset
+                t = base_t
 
                 self.data[mp]['xdata'].append(t)
                 self.data[mp]['idata'].append(c)
