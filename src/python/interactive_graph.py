@@ -9,6 +9,9 @@ from matplotlib.figure import Figure
 from mpl_toolkits.axes_grid.parasite_axes import SubplotHost
 
 import collections
+import numpy as np
+import scipy
+import scipy.stats
 
 import pyenergy
 
@@ -180,6 +183,13 @@ class Graph(QMainWindow):
             grid.addWidget(QLabel("Plot Power"), 4, 0)
             grid.addWidget(cb, 4, 1, alignment=Qt.AlignCenter)
 
+            l = QLineEdit()
+            l.setMinimumWidth(10)
+            l.setMaximumWidth(50)
+            self.controls[mp].append(l)
+            grid.addWidget(QLabel("Label"), 5, 0)
+            grid.addWidget(l, 5, 1, alignment=Qt.AlignCenter)
+
             box = QGroupBox(mp)
             box.setLayout(grid)
             box.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
@@ -237,26 +247,30 @@ class Graph(QMainWindow):
 
 
         linestyles = [["-","-","-","-"], ["-","-","-","-"], ["-","-","-","-"]]
-        for i in range(3):
-            if n_points[i] > 1:
-                linestyles[i] = ["-*", "-+", "-s", "-"]
+        # for i in range(3):
+        #     if n_points[i] > 1:
+        #         linestyles[i] = ["-*", "-+", "-s", "-"]
 
         for i,(mp, vals) in enumerate(sorted(self.data.items())):
+            # Calculate the number of samples in the window
+            n = int(len(filter(lambda x: x >= vals["xdata"][-1] - self.tinterval*self.wsize, vals['xdata']))*1.1)
+
             if self.state[mp][1]:
                 p1,  = self.axes.plot(vals["xdata"], vals["idata"], linestyles[0][i], color='g')
                 self.plots.append(p1)
-                maxis.append(max(vals["idata"]))
-                minis.append(min(vals["idata"]))
+                maxis.append(max(vals["idata"][-n:]))
+                minis.append(min(vals["idata"][-n:]))
+
             if self.state[mp][2]:
                 p1,  = self.vaxes.plot(vals["xdata"], vals["vdata"], linestyles[1][i], color='b')
                 self.plots.append(p1)
-                maxvs.append(max(vals["vdata"]))
-                minvs.append(min(vals["vdata"]))
+                maxvs.append(max(vals["vdata"][-n:]))
+                minvs.append(min(vals["vdata"][-n:]))
             if self.state[mp][3]:
                 p1,  = self.paxes.plot(vals["xdata"], vals["pdata"], linestyles[2][i], color='r')
                 self.plots.append(p1)
-                maxps.append(max(vals["pdata"]))
-                minps.append(min(vals["pdata"]))
+                maxps.append(max(vals["pdata"][-n:]))
+                minps.append(min(vals["pdata"][-n:]))
 
             if self.state[mp][1] or self.state[mp][2] or self.state[mp][3]:
                 maxtimes.append(max(vals["xdata"]))
@@ -270,6 +284,8 @@ class Graph(QMainWindow):
         self.vaxes.set_xlim([ mmtimes - self.tinterval*self.wsize,  mmtimes])
         self.paxes.set_xlim([ mmtimes - self.tinterval*self.wsize,  mmtimes])
 
+        toff = self.tinterval*self.wsize * 0.1
+
         poff = (max(maxps) - min(minps)) *0.1
         self.paxes.set_ylim([min(minps)-poff, max(maxps)+poff])
 
@@ -278,6 +294,18 @@ class Graph(QMainWindow):
 
         voff = (max(maxvs) - min(minvs)) *0.1
         self.vaxes.set_ylim([min(minvs)-voff, max(maxvs)+voff])
+
+        bbox_props = dict(boxstyle="round", fc="w", ec="0.5", alpha=0.8)
+        for i,(mp, vals) in enumerate(sorted(self.data.items())):
+            if self.state[mp][1]:
+                l = self.axes.text(vals["xdata"][-1] - toff/2, np.mean(vals["idata"][-self.wsize/10:]), self.state[mp][4], ha="right", bbox=bbox_props)
+                self.plots.append(l)
+            if self.state[mp][2]:
+                l = self.vaxes.text(vals["xdata"][-1] - toff/2, np.mean(vals["vdata"][-self.wsize/10:]), self.state[mp][4], ha="right", bbox=bbox_props)
+                self.plots.append(l)
+            if self.state[mp][3]:
+                l = self.paxes.text(vals["xdata"][-1] - toff/2, np.mean(vals["pdata"][-self.wsize/10:]), self.state[mp][4], ha="right", bbox=bbox_props)
+                self.plots.append(l)
 
         self.canvas.draw()
 
@@ -301,10 +329,10 @@ class Graph(QMainWindow):
                   "vdata": []},
             }
         self.state = {
-            "1": [2, False, False, False],
-            "2": [2, False, False, False],
-            "3": [2, False, False, False],
-            "Self": [2, False, False, False],
+            "1": [2, False, False, False, "1"],
+            "2": [2, False, False, False, "2"],
+            "3": [2, False, False, False, "3"],
+            "Self": [2, False, False, False, "Self"],
             }
         self.plots = []
 
@@ -320,6 +348,8 @@ class Graph(QMainWindow):
             for i, control in enumerate(vals):
                 if i == 0:
                     state[mp].append(control.currentIndex())
+                elif i == 4:
+                    state[mp].append(control.text())
                 else:
                     state[mp].append(control.checkState() == 2)
         return state
@@ -339,9 +369,9 @@ class Graph(QMainWindow):
             stateChange = False
 
             # Check we need to enable or disable a measurement point
-            if bool(sum(state[mp][1:])) != bool(sum(self.state[mp][1:])):
+            if bool(sum(state[mp][1:4])) != bool(sum(self.state[mp][1:4])):
                 stateChange = True
-                if bool(sum(state[mp][1:])):
+                if bool(sum(state[mp][1:4])):
                     self.em.enableMeasurementPoint(i+1)
                     self.em.start(i+1)
 
@@ -355,7 +385,7 @@ class Graph(QMainWindow):
                     if mp == self.tref:
                         disabled_tref = mp
 
-            if bool(sum(state[mp][1:])) or stateChange:
+            if bool(sum(state[mp][1:4])) or stateChange:
                 m = self.em.getInstantaneous(i+1)
                 measurements[mp] = m
 
@@ -371,13 +401,14 @@ class Graph(QMainWindow):
 
         if self.tref is not None:
             base_t = measurements[self.tref][4]* 2. / 168000000*2. + self.toffset
+        else:
+            base_t = 0
 
         for mp, m in measurements.items():
                 i = {"1": 1, "2":2, "3":3, "Self":4}[mp]
                 res = self.em.measurement_params[i]['resistor']
                 vref = self.em.measurement_params[i]['vref']
                 gain = self.em.measurement_params[i]['gain']
-                print res, mp, i
 
                 v = float(vref) / 4096. * m[2] * 2
                 c = float(vref) / gain / res / 4096. * m[3]
