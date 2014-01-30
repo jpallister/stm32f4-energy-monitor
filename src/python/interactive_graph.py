@@ -362,10 +362,10 @@ class Graph(QMainWindow):
                 if first_on is None and mp != disabled_tref:
                     first_on = mp
 
-        if self.tref is None:
+        if self.tref is None or first_on is None:
             self.tref = first_on
 
-        if disabled_tref is not None:
+        if disabled_tref is not None and first_on is not None:
             self.toffset += (measurements[self.tref][4] - measurements[first_on][4]) * 2. / 168000000*2.
             self.tref = first_on
 
@@ -402,7 +402,7 @@ def main():
     app = QApplication(sys.argv)
     app.setStyle("plastique")
 
-    em = pyenergy.EnergyMonitor("EE00")
+    em = pyenergy.EnergyMonitor("MSP0")
     em.connect()
 
     form = Graph(em)
