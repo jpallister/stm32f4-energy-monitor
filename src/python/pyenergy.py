@@ -25,12 +25,28 @@ class EnergyMonitor(object):
 
     port_mappings = {1: ["PA2", "PC2"], 2: ["PA3", "PA1"], 3: ["PB1", "PC5"], 4:["PB0", "PC4"]}
 
+    newestVersion = 10
+    baseVersion = 10
+
     def __init__(self, serial="EE00"):
         # Find the usb device that corresponds to the serial number
-        #devs = usb.core.find(idVendor=0xf539, idProduct=0xf539,
-        #    find_all = True, custom_match=lambda d: usb.util.get_string(d, 256, d.iSerialNumber) == serial)
-        devs = usb.core.find(idVendor=0xf539, idProduct=0xf539,
-            find_all = True)
+        devs = usb.core.find(idVendor=0xf539, idProduct=0xf539, find_all = True)
+
+        sdevs = []
+        for d in devs:
+            d.set_configuration()
+            v = self.getVersion(d)
+            if v < EnergyMonitor.baseVersion:
+                warning("Device attached with old firmware, cannot check if this is desired device")
+                continue
+
+            s = self.getSerial(d)
+            print s
+
+            if s == serial:
+                sdevs.append(d)
+
+        devs = sdevs
 
         if len(devs) > 1:
             warning("More than one device available with serial " + serial)
@@ -55,6 +71,33 @@ class EnergyMonitor(object):
     # Connect to the device
     def connect(self):
         self.dev.set_configuration()
+        self.version = self.getVersion()
+
+        if self.version < EnergyMonitor.baseVersion:
+            error("Firmware is too old, please update")
+        if self.version < EnergyMonitor.newestVersion:
+            warning("More recent firmware is available, please update")
+
+    # Get version
+    def getVersion(self, dev=None):
+        if dev is None:
+            dev = self.dev
+        try:
+            b = dev.ctrl_transfer(0xc1, 12, 0, 0, 4)
+        except usb.core.USBError as e:
+            if e.errno == 32:
+                return 0
+            raise
+        version = unpack("=L", b)[0]
+        return version
+
+    # Get serial
+    def getSerial(self, dev=None):
+        if dev is None:
+            dev = self.dev
+        b = dev.ctrl_transfer(0xc1, 13, 0, 0, 4)
+        serial = unpack("=4s", b)[0]
+        return serial
 
     # Toggle the LEDs on the device
     def toggleLEDs(self):

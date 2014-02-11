@@ -160,6 +160,8 @@ char interrupt_buf[4]= {0};
 
 uint8_t control_buffer[128] __attribute__((aligned (16)));
 
+unsigned versionNumber=10;
+
 /////////////////////////////////////////////////////////////////////
 
 void exti_setup(int m_point)
@@ -398,6 +400,19 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
         *buf = (uint8_t*)&m_points[req->wValue-1].id;
         break;
     }
+    case 12:    // Get version
+    {
+        *len = sizeof(versionNumber);
+        *buf = (uint8_t*)&versionNumber;
+        break;
+    }
+    case 13:    // Get serial
+    {
+        *len = 4;
+        *buf = (uint8_t*)serial_str;
+        break;
+    }
+
     default:
         return 0;
     }
