@@ -43,10 +43,6 @@ SECTIONS
 		*(.vectors)	/* Vector table */
 	} >vecs
 
-	.flash : {
-		*(.flash*);
-	} >flash
-
 	.text : {
 		*(.text*)	/* Program code */
 		. = ALIGN(4);
