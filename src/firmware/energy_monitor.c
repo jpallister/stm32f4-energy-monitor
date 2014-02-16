@@ -87,12 +87,12 @@ static const struct usb_config_descriptor config = {
     .interface = ifaces,
 };
 
-static const char serial_str[] __attribute__ ((section (".flash"))) = "EE00";
+static const char *serial_str = (const char*)0x08004000;
 
 static const char *usb_strings[] = {
     "James Pallister",
     "Medium speed energy monitor",
-    serial_str,
+    0x08004000,
 };
 
 void dma_setup();
@@ -264,6 +264,22 @@ void stop_measurement(int m_point)
     }
 }
 
+void flash_serial(char b1, char b2, char b3, char b4)
+{
+    uint32_t base_addr = (uint32_t) serial_str;
+
+    flash_unlock();
+    flash_erase_sector(1, FLASH_CR_PROGRAM_X32);
+
+    flash_program_byte(base_addr+0, b1);
+    flash_program_byte(base_addr+1, b2);
+    flash_program_byte(base_addr+2, b3);
+    flash_program_byte(base_addr+3, b4);
+
+    flash_program_byte(base_addr+4, 0x0);
+    flash_lock();
+}
+
 static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *req, uint8_t **buf,
         uint16_t *len, void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
 {
@@ -295,21 +311,10 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
     }
     case 3:     // Set serial
     {
-        uint32_t base_addr = (uint32_t) serial_str;
-
         if(*len != 0)
             return 0;
 
-        flash_unlock();
-        flash_erase_sector(1, FLASH_CR_PROGRAM_X32);
-
-        flash_program_byte(base_addr+0, req->wValue & 0xFF);
-        flash_program_byte(base_addr+1, req->wValue >> 8);
-        flash_program_byte(base_addr+2, req->wIndex & 0xFF);
-        flash_program_byte(base_addr+3, req->wIndex >> 8);
-
-        flash_program_byte(base_addr+4, 0x0);
-        flash_lock();
+        flash_serial(req->wValue & 0xFF, req->wValue >> 8, req->wIndex & 0xFF, req->wIndex >> 8);
 
         break;
     }
@@ -651,6 +656,12 @@ int main(void)
     rcc_peripheral_enable_clock(&RCC_AHB1ENR, RCC_AHB1ENR_IOPCEN);
     rcc_peripheral_enable_clock(&RCC_AHB1ENR, RCC_AHB1ENR_IOPDEN);
     rcc_peripheral_enable_clock(&RCC_AHB2ENR, RCC_AHB2ENR_OTGFSEN);
+
+    // First want to check our serial. If not set, set it
+    if(serial_str[0] == 0xFF && serial_str[1] == 0xFF && serial_str[2] == 0xFF && serial_str[3] == 0xFF)
+    {
+        flash_serial('E', 'E', '0', '0');
+    }
 
     gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9 | GPIO11 | GPIO12);
     gpio_mode_setup(GPIOD, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO15 | GPIO14 | GPIO13 | GPIO12);

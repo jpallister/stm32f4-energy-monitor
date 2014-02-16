@@ -16,7 +16,7 @@ error = logger.error
 
 # import multiprocessing
 
-Measurement = namedtuple('Measurement', 'energy time peak_power peak_voltage peak_current n_samples avg_voltage avg_current')
+Measurement = namedtuple('Measurement', 'energy time peak_power peak_voltage peak_current n_samples avg_voltage avg_current avg_power')
 
 class EnergyMonitor(object):
     MeasurementData = namedtuple('MeasurementData', 'energy_accum elapsed_time peak_power peak_voltage peak_current n_samples avg_current avg_voltage')
@@ -203,8 +203,9 @@ class EnergyMonitor(object):
         pi = float(vref) / gain / resistor / 4096. * md.peak_current
         av = float(vref) / 4096. * md.avg_voltage / md.n_samples * 2
         ai = float(vref) / gain / resistor / 4096. * md.avg_current / md.n_samples
+        ap = en/el
 
-        m = Measurement(en, el, pp, pv, pi, md.n_samples, av, ai)
+        m = Measurement(en, el, pp, pv, pi, md.n_samples, av, ai, ap)
 
         return m
 
