@@ -1,0 +1,40 @@
+{
+    "stm32f0discovery" : {
+        "energy-monitor" : "CXM0",
+        "trigger-pin" : "PA0",
+        "measurement-point" : 1,
+        "resistor" : 1
+    },
+    "stm32vldiscovery" : {
+        "energy-monitor" : "CXM3",
+        "trigger-pin" : "PA0",
+        "measurement-point" : 1,
+        "resistor" : 1
+    },
+    "atmega328p" : {
+        "energy-monitor" : "AVR0",
+        "trigger-pin" : "PA0",
+        "measurement-point" : 1,
+        "resistor": 1,
+        "serial-dev-id": "usb-FTDI_FT232R_USB_UART_A501U096-if00-port0"
+    },
+    "msp-exp430f5529" : {
+        "energy-monitor" : "MSP0",
+        "trigger-pin" : "PA0",
+        "measurement-point" : 1,
+        "resistor": 1
+    },
+    "msp-exp430fr5739" : {
+        "energy-monitor" : "FRAM",
+        "trigger-pin" : "PA0",
+        "measurement-point" : 1,
+        "resistor": 1
+    },
+    "pic32mx250f128b" : {
+        "energy-monitor" : "MIPS",
+        "trigger-pin" : "PA0",
+        "measurement-point" : 1,
+        "resistor": 1,
+        "serial-number": "pickit"
+    }
+}
