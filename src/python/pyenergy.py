@@ -6,7 +6,13 @@ from struct import *
 from copy import copy
 from collections import namedtuple
 
-from logging import warning, error
+import logging
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
+warning = logger.warning
+error = logger.error
+
 
 # import multiprocessing
 
@@ -41,7 +47,6 @@ class EnergyMonitor(object):
                 continue
 
             s = self.getSerial(d)
-            print s
 
             if s == serial:
                 sdevs.append(d)
@@ -49,7 +54,7 @@ class EnergyMonitor(object):
         devs = sdevs
 
         if len(devs) > 1:
-            warning("More than one device available with serial " + serial)
+            warning("More than one device ({}) available with serial {}".format(len(devs), serial))
         if len(devs) == 0:
             raise RuntimeError("Cannot find energy monitor with serial " + serial)
 
