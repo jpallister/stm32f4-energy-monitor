@@ -29,7 +29,6 @@ import json
 
 import pyenergy
 from time import sleep
-
 import logging
 
 logger = logging.getLogger(__name__)
@@ -37,17 +36,26 @@ warning = logger.warning
 debug = logger.debug
 
 # Global config options
+avr_objcopy = "@AVROBJCOPY@"
+avrdude = "@AVRDUDE@"
 
-stlink = "/home/james/tools/stlink/st-util"
-arm_gdb = "arm-none-eabi-gdb"
+arm_gdb = "@ARMGDB@"
+stutil = "@STUTIL@"
 
-avrdude = "avrdude"
-avr_objcopy = "avr-objcopy"
+pic32_objcopy = "@PIC32OBJCOPY@"
+pic32prog = "@PIC32PROG@"
 
-pic32_objcopy = "pic32-objcopy"
-pic32prog = "~/tools/pic32prog/pic32prog"
+mspdebug = "@MSPDEBUG@"
 
-mspdebug = "~/tools/mspdebug/mspdebug"
+# Which platforms have all the tools needed
+enabled_platforms = {
+    "stm32f0discovery": @STM32F0DISCOVERY@,
+    "stm32vldiscovery": @STM32VLDISCOVERY@,
+    "atmega328p": @ATMEGA328P@,
+    "pic32mx250f128b": @PIC32MX250F128B@,
+    "mspexp430f5529": @MSPEXP430F5529@,
+    "mspexp430fr5739": @MSPEXP430FR5739@,
+    }
 
 measurement_config = None
 
@@ -119,9 +127,13 @@ def foreground_proc(cmd):
             err =''
         if (out == '' or err == '') and p.poll() != None:
             break
-    
+
 
 def setupMeasurement(platform):
+    # First check that all tools for platform are available
+    if not enabled_platforms[platform]:
+        raise RuntimeError("Platform {0} does not have all the tools configured. Please rerun configure with --enable-{0}".format(platform))
+
     em = pyenergy.EnergyMonitor(measurement_config[platform]['energy-monitor'])
     mp = int(measurement_config[platform]['measurement-point'])
 
@@ -255,7 +267,7 @@ if __name__ == "__main__":
         m = mspexp430fr5739(arguments['EXECUTABLE'])
     else:
         raise RuntimeError("Unknown platform " + arguments['PLATFROM'])
-        
+
     print "Energy:          {}J".format(prettyPrint(m.energy))
     print "Time:            {}s".format(prettyPrint(m.time))
 #    print "Power:           {}W".format(prettyPrint(m.avg_power))
