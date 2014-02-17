@@ -130,7 +130,7 @@ def detect_prog(progname, prompt=False):
 
             if os.path.isdir(path):
                 if os.path.exists(os.path.join(path, progname)):
-                    f = os.path.exists(os.path.join(path, progname))
+                    f = os.path.join(path, progname)
                     break
                 else:
                     print '"{}" cannot be found under directory "{}"'.format(progname,path)

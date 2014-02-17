@@ -23,7 +23,7 @@ Options:
 """
 from docopt import docopt
 
-import subprocess, os
+import subprocess, os, os.path
 import threading
 from collections import namedtuple
 import tempfile
@@ -157,6 +157,7 @@ def loadConfiguration(fname):
 def loadToolConfiguration(fname):
     global tool_config
 
+    fname = os.path.expanduser(fname)
     tool_config = json.load(open(fname))
 
 #######################################################################
@@ -164,8 +165,8 @@ def loadToolConfiguration(fname):
 def stm32f0discovery(fname):
     em = setupMeasurement("stm32f0discovery")
 
-    stproc = background_proc(tool_config['stutil'] + " -p 2001 -c 0x0bb11477 -v0")
-    gdb_launch(tool_config['arm_gdb'], 2001, fname)
+    stproc = background_proc(tool_config['tools']['stutil'] + " -p 2001 -c 0x0bb11477 -v0")
+    gdb_launch(tool_config['tools']['arm_gdb'], 2001, fname)
     kill_background_proc(stproc)
 
     return finishMeasurement("stm32f0discovery", em)
@@ -174,8 +175,8 @@ def stm32f0discovery(fname):
 def stm32vldiscovery(fname):
     em = setupMeasurement("stm32vldiscovery")
 
-    stproc = background_proc(tool_config['stutil'] + " -p 2002 -c 0x1ba01477 -v0")
-    gdb_launch(tool_config['arm_gdb'], 2002, fname)
+    stproc = background_proc(tool_config['tools']['stutil'] + " -p 2002 -c 0x1ba01477 -v0")
+    gdb_launch(tool_config['tools']['arm_gdb'], 2002, fname)
     kill_background_proc(stproc)
 
     return finishMeasurement("stm32vldiscovery", em)
@@ -187,11 +188,11 @@ def atmega328p(fname):
     # Create temporary file and convert to hex file
     tf = tempfile.NamedTemporaryFile(delete=False)
     tf.close()
-    foreground_proc("{} -O ihex {} {}".format(tool_config['avr_objcopy'], fname, tf.name))
+    foreground_proc("{} -O ihex {} {}".format(tool_config['tools']['avr_objcopy'], fname, tf.name))
 
     # Flash the hex file to the AVR chip
     ser_id = measurement_config['atmega328p']['serial-dev-id']
-    cmdline = "{} -F -V -c arduino -p atmega328p -e -P `readlink -m /dev/serial/by-id/{}` -b 115200 -U flash:w:{}".format(tool_config['avrdude'], ser_id, tf.name)
+    cmdline = "{} -F -V -c arduino -p atmega328p -e -P `readlink -m /dev/serial/by-id/{}` -b 115200 -U flash:w:{}".format(tool_config['tools']['avrdude'], ser_id, tf.name)
     foreground_proc(cmdline)
 
     os.unlink(tf.name)
@@ -201,7 +202,7 @@ def atmega328p(fname):
 def mspexp430f5529(fname):
     em = setupMeasurement("msp-exp430f5529")
 
-    foreground_proc("{} tilib -q \"prog {}\" &".format(tool_config['mspdebug'], fname))
+    foreground_proc("{} tilib -q \"prog {}\" &".format(tool_config['tools']['mspdebug'], fname))
 
     return finishMeasurement("msp-exp430f5529", em)
 
@@ -209,7 +210,7 @@ def mspexp430f5529(fname):
 def mspexp430fr5739(fname):
     em = setupMeasurement("msp-exp430fr5739")
 
-    foreground_proc("{} rf2500 -q \"prog {}\" &".format(tool_config['mspdebug'], fname))
+    foreground_proc("{} rf2500 -q \"prog {}\" &".format(tool_config['tools']['mspdebug'], fname))
 
     return finishMeasurement("msp-exp430fr5739", em)
 
@@ -218,11 +219,11 @@ def pic32mx250f128b(fname):
     # Create temporary file and convert to hex file
     tf = tempfile.NamedTemporaryFile(delete=False)
     tf.close()
-    foreground_proc("{} -O ihex {} {}".format(tool_config['pic32_objcopy'], fname, tf.name))
+    foreground_proc("{} -O ihex {} {}".format(tool_config['tools']['pic32_objcopy'], fname, tf.name))
 
     # Program the PIC and leave power on to run test
     em = setupMeasurement("pic32mx250f128b")
-    foreground_proc("{} -p {}".format(tool_config['pic32prog'], tf.name))
+    foreground_proc("{} -p {}".format(tool_config['tools']['pic32prog'], tf.name))
 
     os.unlink(tf.name)
     return finishMeasurement("pic32mx250f128b", em)
