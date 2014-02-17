@@ -9,6 +9,8 @@ Options:
     -h --help           Show this usage message
     -c --config CONF    Specify the measurement configuration to load
                             [default: measurement.json]
+    -t --tools CONF     Config file for the tools needed to run on a platform
+                            [default: ~/.platformrunrc]
     -v --verbose        Be verbose
 
     PLATFORM        Specify the platform on which to run.
@@ -35,28 +37,8 @@ logger = logging.getLogger(__name__)
 warning = logger.warning
 debug = logger.debug
 
-# Global config options
-avr_objcopy = "@AVROBJCOPY@"
-avrdude = "@AVRDUDE@"
 
-arm_gdb = "@ARMGDB@"
-stutil = "@STUTIL@"
-
-pic32_objcopy = "@PIC32OBJCOPY@"
-pic32prog = "@PIC32PROG@"
-
-mspdebug = "@MSPDEBUG@"
-
-# Which platforms have all the tools needed
-enabled_platforms = {
-    "stm32f0discovery": @STM32F0DISCOVERY@,
-    "stm32vldiscovery": @STM32VLDISCOVERY@,
-    "atmega328p": @ATMEGA328P@,
-    "pic32mx250f128b": @PIC32MX250F128B@,
-    "mspexp430f5529": @MSPEXP430F5529@,
-    "mspexp430fr5739": @MSPEXP430FR5739@,
-    }
-
+tool_config = None
 measurement_config = None
 
 #######################################################################
@@ -131,7 +113,7 @@ def foreground_proc(cmd):
 
 def setupMeasurement(platform):
     # First check that all tools for platform are available
-    if not enabled_platforms[platform]:
+    if platform not in tool_config['enabled']:
         raise RuntimeError("Platform {0} does not have all the tools configured. Please rerun configure with --enable-{0}".format(platform))
 
     em = pyenergy.EnergyMonitor(measurement_config[platform]['energy-monitor'])
@@ -172,13 +154,18 @@ def loadConfiguration(fname):
 
     measurement_config = json.load(open(fname))
 
+def loadToolConfiguration(fname):
+    global tool_config
+
+    tool_config = json.load(open(fname))
+
 #######################################################################
 
 def stm32f0discovery(fname):
     em = setupMeasurement("stm32f0discovery")
 
-    stproc = background_proc(stlink + " -p 2001 -c 0x0bb11477 -v0")
-    gdb_launch(arm_gdb, 2001, fname)
+    stproc = background_proc(tool_config['stutil'] + " -p 2001 -c 0x0bb11477 -v0")
+    gdb_launch(tool_config['arm_gdb'], 2001, fname)
     kill_background_proc(stproc)
 
     return finishMeasurement("stm32f0discovery", em)
@@ -187,8 +174,8 @@ def stm32f0discovery(fname):
 def stm32vldiscovery(fname):
     em = setupMeasurement("stm32vldiscovery")
 
-    stproc = background_proc(stlink + " -p 2002 -c 0x1ba01477 -v0")
-    gdb_launch(arm_gdb, 2002, fname)
+    stproc = background_proc(tool_config['stutil'] + " -p 2002 -c 0x1ba01477 -v0")
+    gdb_launch(tool_config['arm_gdb'], 2002, fname)
     kill_background_proc(stproc)
 
     return finishMeasurement("stm32vldiscovery", em)
@@ -200,11 +187,11 @@ def atmega328p(fname):
     # Create temporary file and convert to hex file
     tf = tempfile.NamedTemporaryFile(delete=False)
     tf.close()
-    foreground_proc("{} -O ihex {} {}".format(avr_objcopy, fname, tf.name))
+    foreground_proc("{} -O ihex {} {}".format(tool_config['avr_objcopy'], fname, tf.name))
 
     # Flash the hex file to the AVR chip
     ser_id = measurement_config['atmega328p']['serial-dev-id']
-    cmdline = "{} -F -V -c arduino -p atmega328p -e -P `readlink -m /dev/serial/by-id/{}` -b 115200 -U flash:w:{}".format(avrdude, ser_id, tf.name)
+    cmdline = "{} -F -V -c arduino -p atmega328p -e -P `readlink -m /dev/serial/by-id/{}` -b 115200 -U flash:w:{}".format(tool_config['avrdude'], ser_id, tf.name)
     foreground_proc(cmdline)
 
     os.unlink(tf.name)
@@ -214,7 +201,7 @@ def atmega328p(fname):
 def mspexp430f5529(fname):
     em = setupMeasurement("msp-exp430f5529")
 
-    foreground_proc("{} tilib -q \"prog {}\" &".format(mspdebug, fname))
+    foreground_proc("{} tilib -q \"prog {}\" &".format(tool_config['mspdebug'], fname))
 
     return finishMeasurement("msp-exp430f5529", em)
 
@@ -222,7 +209,7 @@ def mspexp430f5529(fname):
 def mspexp430fr5739(fname):
     em = setupMeasurement("msp-exp430fr5739")
 
-    foreground_proc("{} rf2500 -q \"prog {}\" &".format(mspdebug, fname))
+    foreground_proc("{} rf2500 -q \"prog {}\" &".format(tool_config['mspdebug'], fname))
 
     return finishMeasurement("msp-exp430fr5739", em)
 
@@ -231,17 +218,17 @@ def pic32mx250f128b(fname):
     # Create temporary file and convert to hex file
     tf = tempfile.NamedTemporaryFile(delete=False)
     tf.close()
-    foreground_proc("{} -O ihex {} {}".format(pic32_objcopy, fname, tf.name))
+    foreground_proc("{} -O ihex {} {}".format(tool_config['pic32_objcopy'], fname, tf.name))
 
     # Program the PIC and leave power on to run test
     em = setupMeasurement("pic32mx250f128b")
-    foreground_proc("{} -p {}".format(pic32prog, tf.name))
+    foreground_proc("{} -p {}".format(tool_config['pic32prog'], tf.name))
 
     os.unlink(tf.name)
     return finishMeasurement("pic32mx250f128b", em)
 
 
-if __name__ == "__main__":
+def main():
     arguments = docopt(__doc__)
 
     logging.basicConfig()
@@ -252,10 +239,11 @@ if __name__ == "__main__":
         logging.getLogger('').setLevel(logging.DEBUG)
 
     loadConfiguration(arguments['--config'])
+    loadToolConfiguration(arguments['--tools'])
 
     if arguments['PLATFORM'] == "stm32f0discovery":
         m = stm32f0discovery(arguments['EXECUTABLE'])
-    if arguments['PLATFORM'] == "stm32vldiscovery":
+    elif arguments['PLATFORM'] == "stm32vldiscovery":
         m = stm32vldiscovery(arguments['EXECUTABLE'])
     elif arguments['PLATFORM'] == "atmega328p":
         m = atmega328p(arguments['EXECUTABLE'])
@@ -266,10 +254,13 @@ if __name__ == "__main__":
     elif arguments['PLATFORM'] == "msp-exp430fr5739":
         m = mspexp430fr5739(arguments['EXECUTABLE'])
     else:
-        raise RuntimeError("Unknown platform " + arguments['PLATFROM'])
+        raise RuntimeError("Unknown platform " + arguments['PLATFORM'])
 
     print "Energy:          {}J".format(prettyPrint(m.energy))
     print "Time:            {}s".format(prettyPrint(m.time))
 #    print "Power:           {}W".format(prettyPrint(m.avg_power))
     print "Average current: {}A".format(prettyPrint(m.avg_current))
     print "Average voltage: {}V".format(prettyPrint(m.avg_voltage))
+
+if __name__ == "__main__":
+    main()
