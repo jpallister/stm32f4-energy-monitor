@@ -19,7 +19,7 @@ AC_SUBST([CFLAGS], ["-mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 
 
 AC_PROG_LIBTOOL
 LT_INIT
-AC_CONFIG_SRCDIR([firmware/])
+AC_CONFIG_SRCDIR([src/])
 
 AC_PROG_CC
 
@@ -27,5 +27,5 @@ AC_PROG_CC
 
 AC_CHECK_LIB(opencm3_stm32f4, nvic_enable_irq, [], [AC_MSG_ERROR([libopencm3_stm32f4 not found])])
 
-AC_CONFIG_FILES([Makefile firmware/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile])
 AC_OUTPUT
