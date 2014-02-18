@@ -15,7 +15,7 @@ setup(
     # url = "http://packages.python.org/an_example_pypi_project",
     package_dir={'':'src'},
     packages=['pyenergy', 'platformrun'],
-    long_description=read('README.md'),
+    long_description=read('README.rst'),
     install_requires=['pyusb>=1.0.0b1', 'docopt>=0.6.1'],
     zip_safe=True,
     entry_points = {
