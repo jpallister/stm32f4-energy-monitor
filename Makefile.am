@@ -1,3 +1,3 @@
-SUBDIRS=src/firmware
+SUBDIRS=firmware
 
 ACLOCAL_AMFLAGS= -I m4

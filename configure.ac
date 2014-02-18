@@ -9,19 +9,23 @@ AM_INIT_AUTOMAKE
 
 AM_MAINTAINER_MODE([disable])
 
+if test x$host_alias != xarm-none-eabi; then
+    AC_MSG_ERROR([Please rerun with --host=arm-none-eabi])
+fi
+
 # gcc-arm-embedded requires these libraries for the tests, else they'll fail
-AC_SUBST([LDFLAGS], ["-lc -lrdimon $LDFLAGS"])
+AC_SUBST([LDFLAGS], ["-lc -lnosys $LDFLAGS"])
 AC_SUBST([CFLAGS], ["-mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 $CFLAGS"])
 
 AC_PROG_LIBTOOL
 LT_INIT
-AC_CONFIG_SRCDIR([src/firmware/])
+AC_CONFIG_SRCDIR([firmware/])
 
 AC_PROG_CC
 
 #AC_PROG_CC([arm-none-eabi-gcc])
 
-AC_CHECK_LIB(opencm3_stm32f4, nvic_enable_irq)
+AC_CHECK_LIB(opencm3_stm32f4, nvic_enable_irq, [], [AC_MSG_ERROR([libopencm3_stm32f4 not found])])
 
-AC_CONFIG_FILES([Makefile src/firmware/Makefile])
+AC_CONFIG_FILES([Makefile firmware/Makefile])
 AC_OUTPUT
