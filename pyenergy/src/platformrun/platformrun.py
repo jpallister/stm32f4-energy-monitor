@@ -8,7 +8,7 @@ Usage:
 Options:
     -h --help           Show this usage message
     -c --config CONF    Specify the measurement configuration to load
-                            [default: measurement.json]
+                            [default: ~/.measurementrc]
     -t --tools CONF     Config file for the tools needed to run on a platform
                             [default: ~/.platformrunrc]
     -v --verbose        Be verbose
@@ -152,6 +152,7 @@ def prettyPrint(v):
 def loadConfiguration(fname):
     global measurement_config
 
+    fname = os.path.expanduser(fname)
     measurement_config = json.load(open(fname))
 
 def loadToolConfiguration(fname):
