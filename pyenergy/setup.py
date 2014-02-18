@@ -20,7 +20,8 @@ setup(
     entry_points = {
         'console_scripts': [
             'platformrun = platformrun:main',
-            'platformrun-detect = platformrun.detect:main'
+            'platformrun-detect = platformrun.detect:main',
+            'energytool = pyenergy.tools:main',
         ],
         # 'gui_scripts': [
         #     'interactive_graph = pyenergy.interactive_graph:main'
