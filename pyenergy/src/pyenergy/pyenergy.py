@@ -35,8 +35,7 @@ class EnergyMonitor(object):
     baseVersion = 10
 
     def __init__(self, serial="EE00"):
-        # Find the usb device that corresponds to the serial number
-        devs = usb.core.find(idVendor=0xf539, idProduct=0xf539, find_all = True)
+        devs = getBoards()
 
         sdevs = []
         for d in devs:
@@ -50,6 +49,8 @@ class EnergyMonitor(object):
 
             if s == serial:
                 sdevs.append(d)
+
+            # TODO else release config
 
         devs = sdevs
 
@@ -72,6 +73,11 @@ class EnergyMonitor(object):
         self.samplePeriod = 500
 
         self.adcMpoint = [None, None, None]
+
+    def getBoards(self):
+        # Find the usb device that corresponds to the serial number
+        devs = usb.core.find(idVendor=0xf539, idProduct=0xf539, find_all = True)
+        return devs
 
     # Connect to the device
     def connect(self):

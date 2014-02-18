@@ -6,6 +6,7 @@ Usage:
     energytool (-m MPOINT)... [options] read SERIAL PIN
     energytool (-m MPOINT)... [options] continuous SERIAL
     energytool (-m MPOINT)... [options] debug SERIAL
+    energytool list
 
 Commands:
     read        This sets up a trigger on the specified PIN and waits for an
@@ -17,6 +18,9 @@ Commands:
     debug       Output some debug data about the instantaneous voltages seen
                 on the ADCs, along with current and voltage.
 
+    list        Show the serial numbers and API version of each connected
+                energy monitor.
+
 Options:
     -m --measurement MPOINT     Specify a measurement point to use (up to 3)
                                 can be specified.
@@ -26,6 +30,7 @@ Options:
 from docopt import docopt
 import pyenergy
 from time import sleep
+import usb.util
 
 def prettyPrint(v):
     units = ['', 'm', 'u', 'n', 'p']
@@ -101,6 +106,28 @@ def debug(serial, mpoints, delay=0.1):
         print ""
         sleep(delay)
 
+def list_boards():
+    devs = pyenergy.EnergyMonitor.getBoards(None)
+
+    print "Connected energy monitors:"
+
+    if len(devs) > 0:
+        print "    Serial  API"
+    else:
+        print "    None :("
+
+    for d in devs:
+        d.set_configuration()
+        v = self.getVersion(d)
+
+        if v < EnergyMonitor.baseVersion:
+            serial = "{} (?)".format(usb.util.get_string(d, 256, 3))
+        else:
+            serial = self.getSerial(d)
+
+        # TODO release config for d
+
+        print "    {: <8} {}".format(serial, v)
 
 def main():
     arguments = docopt(__doc__)
@@ -113,6 +140,8 @@ def main():
         debug(arguments['SERIAL'], mpoints, float(arguments['--time']))
     elif arguments['continuous']:
         continuous(arguments['SERIAL'], mpoints, float(arguments['--time']))
+    elif arguments['list']:
+        list_boards()
 
 if __name__=="__main__":
     main()
