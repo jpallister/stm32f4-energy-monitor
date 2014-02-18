@@ -6,7 +6,7 @@ def read(fname):
 
 setup(
     name = "pyenergy",
-    version = "1.0",
+    version = "0.1rc1",
     author = "James Pallister",
     author_email = "james.pallister@bristol.ac.uk",
     description = ("An interface to the MAGEEC energy monitor boards"),
@@ -17,6 +17,7 @@ setup(
     packages=['pyenergy', 'platformrun'],
     long_description=read('README.md'),
     install_requires=['pyusb>=1.0.0b1', 'docopt>=0.6.1'],
+    zip_safe=True,
     entry_points = {
         'console_scripts': [
             'platformrun = platformrun:main',
