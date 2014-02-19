@@ -23,16 +23,24 @@ the energy monitors.
         energytool (-m MPOINT)... [options] read SERIAL PIN
         energytool (-m MPOINT)... [options] continuous SERIAL
         energytool (-m MPOINT)... [options] debug SERIAL
+        energytool list
+        energytool changeserial SERIAL NEWSERIAL
 
     Commands:
-        read        This sets up a trigger on the specified PIN and waits for an
-                    energy measurement.
+        read            This sets up a trigger on the specified PIN and waits for
+                        an energy measurement.
 
-        continuous  Continuously read measurements from the specified energy
-                    monitor.
+        continuous      Continuously read measurements from the specified energy
+                        monitor.
 
-        debug       Output some debug data about the instantaneous voltages seen
-                    on the ADCs, along with current and voltage.
+        debug           Output some debug data about the instantaneous voltages
+                        seen on the ADCs, along with current and voltage.
+
+        list            Show the serial numbers and API version of each connected
+                        energy monitor.
+
+        changeserial    Connect to the device specified by SERIAL, and change the
+                        serial to NEWSERIAL
 
 
 Scripting
