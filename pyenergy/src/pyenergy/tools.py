@@ -107,7 +107,7 @@ def debug(serial, mpoints, delay=0.1):
         sleep(delay)
 
 def list_boards():
-    devs = pyenergy.EnergyMonitor.getBoards(None)
+    devs = pyenergy.EnergyMonitor.getBoards()
 
     print "Connected energy monitors:"
 
@@ -118,12 +118,12 @@ def list_boards():
 
     for d in devs:
         d.set_configuration()
-        v = self.getVersion(d)
+        v = pyenergy.EnergyMonitor.getVersion(d)
 
-        if v < EnergyMonitor.baseVersion:
+        if v < pyenergy.EnergyMonitor.baseVersion:
             serial = "{} (?)".format(usb.util.get_string(d, 256, 3))
         else:
-            serial = self.getSerial(d)
+            serial = pyenergy.EnergyMonitor.getSerial(d)
 
         # TODO release config for d
 

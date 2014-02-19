@@ -35,7 +35,7 @@ class EnergyMonitor(object):
     baseVersion = 10
 
     def __init__(self, serial="EE00"):
-        devs = getBoards()
+        devs = self.getBoards()
 
         sdevs = []
         for d in devs:
@@ -74,7 +74,8 @@ class EnergyMonitor(object):
 
         self.adcMpoint = [None, None, None]
 
-    def getBoards(self):
+    @staticmethod
+    def getBoards():
         # Find the usb device that corresponds to the serial number
         devs = usb.core.find(idVendor=0xf539, idProduct=0xf539, find_all = True)
         return devs
@@ -82,7 +83,7 @@ class EnergyMonitor(object):
     # Connect to the device
     def connect(self):
         self.dev.set_configuration()
-        self.version = self.getVersion()
+        self.version = self.getVersion(self)
 
         if self.version < EnergyMonitor.baseVersion:
             error("Firmware is too old, please update")
@@ -90,9 +91,13 @@ class EnergyMonitor(object):
             warning("More recent firmware is available, please update")
 
     # Get version
-    def getVersion(self, dev=None):
-        if dev is None:
-            dev = self.dev
+    @staticmethod
+    def getVersion(dev):
+        try:
+            dev = dev.dev
+        except:
+            pass
+
         try:
             b = dev.ctrl_transfer(0xc1, 12, 0, 0, 4)
         except usb.core.USBError as e:
@@ -103,9 +108,13 @@ class EnergyMonitor(object):
         return version
 
     # Get serial
-    def getSerial(self, dev=None):
-        if dev is None:
-            dev = self.dev
+    @staticmethod
+    def getSerial(dev):
+        try:
+            dev = dev.dev
+        except:
+            pass
+
         b = dev.ctrl_transfer(0xc1, 13, 0, 0, 4)
         serial = unpack("=4s", b)[0]
         return serial
