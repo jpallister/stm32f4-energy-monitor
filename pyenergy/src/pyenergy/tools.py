@@ -7,19 +7,23 @@ Usage:
     energytool (-m MPOINT)... [options] continuous SERIAL
     energytool (-m MPOINT)... [options] debug SERIAL
     energytool list
+    energytool changeserial SERIAL NEWSERIAL
 
 Commands:
-    read        This sets up a trigger on the specified PIN and waits for an
-                energy measurement.
+    read            This sets up a trigger on the specified PIN and waits for
+                    an energy measurement.
 
-    continuous  Continuously read measurements from the specified energy
-                monitor.
+    continuous      Continuously read measurements from the specified energy
+                    monitor.
 
-    debug       Output some debug data about the instantaneous voltages seen
-                on the ADCs, along with current and voltage.
+    debug           Output some debug data about the instantaneous voltages
+                    seen on the ADCs, along with current and voltage.
 
-    list        Show the serial numbers and API version of each connected
-                energy monitor.
+    list            Show the serial numbers and API version of each connected
+                    energy monitor.
+
+    changeserial    Connect to the device specified by SERIAL, and change the
+                    serial to NEWSERIAL
 
 Options:
     -m --measurement MPOINT     Specify a measurement point to use (up to 3)
@@ -125,9 +129,12 @@ def list_boards():
         else:
             serial = pyenergy.EnergyMonitor.getSerial(d)
 
-        # TODO release config for d
-
         print "    {: <8} {}".format(serial, v)
+
+def change_serial(oldser, newser):
+    em = pyenergy.EnergyMonitor(oldser)
+    em.setSerial(newser)
+
 
 def main():
     arguments = docopt(__doc__)
@@ -142,6 +149,8 @@ def main():
         continuous(arguments['SERIAL'], mpoints, float(arguments['--time']))
     elif arguments['list']:
         list_boards()
+    elif arguments['changeserial']:
+        change_serial(arguments['SERIAL'], arguments['NEWSERIAL'])
 
 if __name__=="__main__":
     main()
