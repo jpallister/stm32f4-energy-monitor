@@ -2,6 +2,13 @@
 The pyenergy and platformrun modules
 ====================================
 
+This package contains two modules, pyenergy and platformrun. The first is a
+module which directly interfaces with the `MAGEEC <http://www.mageec.org>`_ energy monitor boards,
+allowing measurements to be taken and the boards to be scripted. The second
+module, platformrun, allows easy measurement of binaries on platforms that can
+be measured with the boards. The procedure for running a binary is different
+for each boards, so module wraps the platforms in a consistent way.
+
 Pyenergy
 ========
 
