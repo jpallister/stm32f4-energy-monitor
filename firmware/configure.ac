@@ -5,7 +5,10 @@ AC_PREREQ([2.68])
 AC_INIT([stm32f4-energy-monitor], [1.0], [james.pallister@embecosm.com])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([build-aux])
+AC_CANONICAL_SYSTEM
+AC_CANONICAL_TARGET
 AM_INIT_AUTOMAKE
+
 
 AM_MAINTAINER_MODE([disable])
 
@@ -26,6 +29,18 @@ AC_PROG_CC
 #AC_PROG_CC([arm-none-eabi-gcc])
 
 AC_CHECK_LIB(opencm3_stm32f4, nvic_enable_irq, [], [AC_MSG_ERROR([libopencm3_stm32f4 not found])])
+
+AC_PATH_PROG(STUTIL, [st-util])
+AC_PATH_TOOL(ARMGDB, gdb)
+
+echo $STUTIL
+echo $ARMGDB
+
+if test x$ARMGDB == xgdb; then
+    AS_UNSET(ARMGDB)
+fi
+
+AM_CONDITIONAL([AUTOFLASH], [test x$STUTIL != x && test x$ARMGDB != x])
 
 AC_CONFIG_FILES([Makefile src/Makefile])
 AC_OUTPUT
