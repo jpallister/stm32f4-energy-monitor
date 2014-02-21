@@ -121,13 +121,17 @@ def list_boards():
         print "    None :("
 
     for d in devs:
-        d.set_configuration()
-        v = pyenergy.EnergyMonitor.getVersion(d)
+        try:
+            d.set_configuration()
+            v = pyenergy.EnergyMonitor.getVersion(d)
 
-        if v < pyenergy.EnergyMonitor.baseVersion:
-            serial = "{} (?)".format(usb.util.get_string(d, 256, 3))
-        else:
-            serial = pyenergy.EnergyMonitor.getSerial(d)
+            if v < pyenergy.EnergyMonitor.baseVersion:
+                serial = "{} (?)".format(usb.util.get_string(d, 256, 3))
+            else:
+                serial = pyenergy.EnergyMonitor.getSerial(d)
+        except usb.core.USBError:
+            serial = "Error"
+            v = "Error"
 
         print "    {: <8} {}".format(serial, v)
 

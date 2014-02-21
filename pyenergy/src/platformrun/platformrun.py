@@ -149,13 +149,13 @@ def prettyPrint(v):
 
 #######################################################################
 
-def loadConfiguration(fname):
+def loadConfiguration(fname="~/.measurementrc"):
     global measurement_config
 
     fname = os.path.expanduser(fname)
     measurement_config = json.load(open(fname))
 
-def loadToolConfiguration(fname):
+def loadToolConfiguration(fname="~/.platformrunrc"):
     global tool_config
 
     fname = os.path.expanduser(fname)
@@ -192,11 +192,21 @@ def atmega328p(fname):
     foreground_proc("{} -O ihex {} {}".format(tool_config['tools']['avr_objcopy'], fname, tf.name))
 
     # Flash the hex file to the AVR chip
+    if logger.getEffectiveLevel() == logging.DEBUG:
+        silence = ""
+    elif logger.getEffectiveLevel() == logging.INFO:
+        silence = "-q"
+    else:
+        silence = "-q -q"
+
     ser_id = measurement_config['atmega328p']['serial-dev-id']
     cmdline = "{} -F -V -c arduino -p atmega328p -e -P `readlink -m /dev/serial/by-id/{}` -b 115200 -U flash:w:{}".format(tool_config['tools']['avrdude'], ser_id, tf.name)
     foreground_proc(cmdline)
 
-    os.unlink(tf.name)
+    try:
+        os.unlink(tf.name)
+    except OSError:
+        pass
     return finishMeasurement("atmega328p", em)
 
 
