@@ -433,7 +433,7 @@ def main():
     app = QApplication(sys.argv)
     app.setStyle("plastique")
 
-    em = pyenergy.EnergyMonitor("MSP0")
+    em = pyenergy.EnergyMonitor("EE00")
     em.connect()
 
     form = Graph(em)
