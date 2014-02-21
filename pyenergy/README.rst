@@ -57,7 +57,8 @@ The module exposes one class, EnergyMonitor. This class can be instantiated as s
 
     em = pyenergy.EnergyMonitor("EE00")
 
-Up to three of the four measurement points can then be enabled::
+This connects to an energy monitor board with the serial ``EE00``. Up to three
+of the four measurement points can then be enabled::
 
     em.enableMeasurementPoint(1)
 

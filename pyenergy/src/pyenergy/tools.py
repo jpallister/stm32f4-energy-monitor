@@ -82,16 +82,21 @@ def continuous(serial, mpoints, delay=0.1):
         print "energy_{0}, power_{0}, avg_current_{0}, avg_voltage_{0},".format(mp),
     print ""
 
-    while True:
-        first = True
-        for mp in mpoints:
-            m = em.getMeasurement(mp)
+    try:
+        while True:
+            first = True
+            for mp in mpoints:
+                m = em.getMeasurement(mp)
 
-            if first:
-                print m.time,
-            print "{}, {}, {}, {},".format(m.energy, m.energy/m.time, m.avg_current, m.avg_voltage),
-        print ""
-        sleep(delay)
+                if first:
+                    print m.time,
+                print "{}, {}, {}, {},".format(m.energy, m.energy/m.time, m.avg_current, m.avg_voltage),
+            print ""
+            sleep(delay)
+    except KeyboardInterrupt:
+        for mp in mpoints:
+            em.stop(mp)
+            em.disableMeasurementPoint(mp)
 
 
 def debug(serial, mpoints, delay=0.1):
@@ -102,13 +107,19 @@ def debug(serial, mpoints, delay=0.1):
         em.enableMeasurementPoint(mp)
         em.start(mp)
 
-    while True:
+    try:
+        while True:
+            for mp in mpoints:
+                meas = em.getInstantaneous(mp)
+                print "Measurement point:", mp
+                em.debugInstantaneous(meas)
+            print ""
+            sleep(delay)
+    except KeyboardInterrupt:
         for mp in mpoints:
-            meas = em.getInstantaneous(mp)
-            print "Measurement point:", mp
-            em.debugInstantaneous(meas)
-        print ""
-        sleep(delay)
+            em.stop(mp)
+            em.disableMeasurementPoint(mp)
+
 
 def list_boards():
     devs = pyenergy.EnergyMonitor.getBoards()
