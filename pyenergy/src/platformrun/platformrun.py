@@ -16,9 +16,12 @@ Options:
     PLATFORM        Specify the platform on which to run.
                     Available platforms are:
                         stm32f0discovery
+                        stm32vldiscovery
                         atmega328p
                         msp-exp430f5529
-
+                        msp-exp430fr5739
+                        pic32mx250f128b
+                        sam4lxplained
 
 """
 from docopt import docopt
@@ -265,6 +268,8 @@ def main():
         m = mspexp430f5529(arguments['EXECUTABLE'])
     elif arguments['PLATFORM'] == "msp-exp430fr5739":
         m = mspexp430fr5739(arguments['EXECUTABLE'])
+    elif arguments['PLATFORM'] == "sam4lxplained":
+        m = sam4lxplained(arguments['EXECUTABLE'])
     else:
         raise RuntimeError("Unknown platform " + arguments['PLATFORM'])
 

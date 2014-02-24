@@ -19,6 +19,34 @@ error = logger.error
 Measurement = namedtuple('Measurement', 'energy time peak_power peak_voltage peak_current n_samples avg_voltage avg_current avg_power')
 
 class EnergyMonitor(object):
+    """
+        The class implements the interface over USB to the MAGEEC enenergy
+        monitor boards. This is fairly simple with pyusb, as all of the
+        commands are implemented over the control endpoint.
+
+        The class should be instantiated with a serial number, which tells
+        it which board to connect to.
+
+            em = EnergyMonitor("EE00")
+
+        Before measuring, the measurement point needs to be enabled. This
+        maps an ADC to the measurement point correctly.
+
+            em.enableMeasurementPoint(1)
+
+        After this, either a trigger can be set, or the measurement
+        manually start and stopped.
+
+            em.setTrigger("PA0", 1)
+
+            em.start(1)
+            em.stop(1)
+
+        The measurement can then be retrieved.
+
+            em.getMeasurement(1)
+    """
+
     MeasurementData = namedtuple('MeasurementData', 'energy_accum elapsed_time peak_power peak_voltage peak_current n_samples avg_current avg_voltage')
     MeasurementData_packing = "=QQLLLLQQ"
 
@@ -29,8 +57,13 @@ class EnergyMonitor(object):
     ADC2 = 1
     ADC3 = 2
 
+    # These port mappings are the pins connected to voltage and current
+    # (respectively) on the stm32f4discovery board.
     port_mappings = {1: ["PA2", "PC2"], 2: ["PA3", "PA1"], 3: ["PB1", "PC5"], 4:["PB0", "PC4"]}
 
+    # The boards did not use to have a version associated with them, the first
+    # version is version 10 (thus if we have an error getting the version we
+    # assume the board is older than version 10).
     newestVersion = 10
     baseVersion = 10
 
@@ -76,12 +109,14 @@ class EnergyMonitor(object):
 
     @staticmethod
     def getBoards():
-        # Find the usb device that corresponds to the serial number
+        """Return a list of all energy monitor boards connected to the host"""
+
         devs = usb.core.find(idVendor=0xf539, idProduct=0xf539, find_all = True)
         return devs
 
     # Connect to the device
     def connect(self):
+        """Connect to the specified board, and check firmware version"""
         self.dev.set_configuration()
         self.version = self.getVersion(self)
 
@@ -93,6 +128,11 @@ class EnergyMonitor(object):
     # Get version
     @staticmethod
     def getVersion(dev):
+        """
+            Get the API version of the energy monitoring boards. This may fail
+            if the firmware is old and does not implement this request,
+            therefore we catch this error.
+        """
         try:
             dev = dev.dev
         except:
@@ -110,6 +150,7 @@ class EnergyMonitor(object):
     # Get serial
     @staticmethod
     def getSerial(dev):
+        """Get the serial from the board."""
         try:
             dev = dev.dev
         except:
@@ -121,20 +162,25 @@ class EnergyMonitor(object):
 
     # Toggle the LEDs on the device
     def toggleLEDs(self):
+        """Toggle some of the LEDs on the board."""
         self.dev.ctrl_transfer(0x41, 0, 0, 0, None)
 
     # Start measuring on m_point
     def start(self, m_point=1):
+        """Clear the number of runs and start measurement on the specified
+        measurement point."""
         self.clearNumberOfRuns()
         self.dev.ctrl_transfer(0x41, 1, int(m_point), 0, None)
 
     # Stop measuring on m_point
     def stop(self, m_point=1):
+        """Stop the measurement on the specified measurement point."""
         self.dev.ctrl_transfer(0x41, 2, int(m_point), 0, None)
 
     # Return whether the measurement point is currently taking
     # measurements or not
     def isRunning(self, m_point=1):
+        """Check whether a particular measurement point is running."""
         b = self.dev.ctrl_transfer(0xc1, 8, int(m_point), 0, 4)
 
         running = unpack("=L", b)
@@ -143,6 +189,15 @@ class EnergyMonitor(object):
     # This counts the number of end measurement signals caught
     # by the energy monitor.
     def getNumberOfRuns(self, m_point=1):
+        """
+            Return the number of 'runs' seen by the energy monitor. This is
+            the number of times a full measurement has been taken since the
+            last clearNumberOfRuns call.
+
+            This is mostly used as part of checking whether a triggered
+            measurement has completed, in measurementComplete.
+        """
+
         b = self.dev.ctrl_transfer(0xc1, 9, int(m_point), 0, 4)
 
         runs = unpack("=L", b)
@@ -150,10 +205,16 @@ class EnergyMonitor(object):
 
     # Reset the number of runs counts to 0
     def clearNumberOfRuns(self, m_point=1):
+        """Clear the counter used to store the number of runs."""
         self.dev.ctrl_transfer(0x41, 10, int(m_point), 0, None)
 
     # Have we completed a measurement?
     def measurementCompleted(self, m_point = 1):
+        """
+            Check whether a full measurement has been taken. Also clear the
+            number of runs if we are waiting for a trigger.
+        """
+
         runs = self.getNumberOfRuns()
         if runs > 1:
             warning("More than one measurement has completed (expected one)")
@@ -164,6 +225,8 @@ class EnergyMonitor(object):
 
     # Set the serial number
     def setSerial(self, ser):
+        """Set the board's serial number. Must be exactly 4 characters long."""
+
         if len(ser) != 4:
             warning("Serial should be 4 characters.")
             ser = (ser + "0000")[:4]
@@ -172,6 +235,17 @@ class EnergyMonitor(object):
     # Set a particular port as a pin trigger for a measurement point
     #   e.g PA0
     def setTrigger(self, port, m_point=1):
+        """
+            Set up a trigger on the specified port and measurement point. The
+            board will automatically start measuring when the pin rises, and
+            stop when the pin falls.
+
+            The port should be of the form P[A-H][0-9]. Not all pins on the
+            board will work, due to peripheral multiplexing and additional
+            components attached to some pins.
+
+            TODO: a list of acceptable and tested pins (PA0 works).
+        """
 
         # TODO check port is of the form PA0
         self.dev.ctrl_transfer(0x41, 4, ord(port[1]) | (m_point<<8), int(port[2]), None)
@@ -180,6 +254,17 @@ class EnergyMonitor(object):
     # only 3 ADCs in the device, so only 3 measurement points
     # can be used simultaneously
     def enableMeasurementPoint(self, m_point, adc=None):
+        """
+            Enable a measurement point on the board.
+
+            There are only 3 ADCs and 4 measurement points. Additionally
+            certain ADCs can only measure certain measurement points,
+            hence this function to map an ADC to a measurement point.
+
+            This function records which measurement points are in use,
+            the attempts to map an ADC to it, if any are free.
+        """
+
         if m_point in self.adcMpoint:
             warning("Tried to enable already enabled measurement point "+str(m_point))
             return
@@ -203,14 +288,28 @@ class EnergyMonitor(object):
     # Disable a particular measurement point, so that the
     # ADC could potentially be used with a different one
     def disableMeasurementPoint(self, m_point):
+        """
+            To disable the measurement point we simply remove it from the set
+            of mapped measurement points.
+
+            We also send a stop command, to ensure no further measurements are
+            taken.
+        """
+
         if m_point not in self.adcMpoint:
             warning("Tried to disable already disabled measurement point "+str(m_point))
             return
         adc = self.adcMpoint.index(m_point)
         self.adcMpoint[adc] = None
-        # TODO: perhaps a control transfer to actually disable the mpoint
+
+        # TODO remove the trigger
+        self.stop()
 
     def convertData(self, md, resistor, gain, vref, samplePeriod):
+        """
+            Convert the data from the raw form returned, and into standard
+            units.
+        """
         en = float(vref)**2 / gain / resistor / 4096**2 * 2 * samplePeriod * 2 / 168000000. * md.energy_accum * 2
         el = md.elapsed_time * 2. / 168000000 * 2
         pp = float(vref)**2 / gain / resistor / 4096**2 * md.peak_power * 2
@@ -225,6 +324,11 @@ class EnergyMonitor(object):
         return m
 
     def getMeasurement(self, m_point=1):
+        """
+            Get the most recent measurement taken for a particular measurement
+            point.
+        """
+
         b = self.dev.ctrl_transfer(0xc1, 6, int(m_point), 0, calcsize(EnergyMonitor.MeasurementData_packing))
         u = EnergyMonitor.MeasurementData._make(unpack(EnergyMonitor.MeasurementData_packing, b))
 
@@ -232,6 +336,11 @@ class EnergyMonitor(object):
 
     # get an instantaneous measurement of voltage and current (debugging)
     def getInstantaneous(self, m_point=1):
+        """
+            This is mostly a debug function that returns the instantaneous
+            current and voltage, as well as an average of the current and
+            voltage over the last 32 samples.
+        """
         b = self.dev.ctrl_transfer(0xc1, 11, int(m_point), 0, calcsize(EnergyMonitor.InstantaneousData_packing))
         args = list(unpack(EnergyMonitor.InstantaneousData_packing, b))
         args.append(m_point)
@@ -239,6 +348,9 @@ class EnergyMonitor(object):
 
     # Convert and display instantaneous measurement
     def debugInstantaneous(self, v):
+        """
+            Display the data returned in getInstantaneous.
+        """
         mp = v[5]
         resistor = self.measurement_params[mp]['resistor']
         gain = self.measurement_params[mp]['gain']
@@ -257,6 +369,7 @@ class EnergyMonitor(object):
         print ""
 
     def disconnect(self):
+        """For now this doesn't do anything"""
         pass
 
 

@@ -7,6 +7,7 @@
 #include <libopencm3/usb/cdc.h>
 #include <libopencm3/cm3/scb.h>
 #include <libopencm3/cm3/nvic.h>
+#include <libopencm3/cm3/systick.h>
 #include <libopencm3/stm32/f4/dma.h>
 #include <libopencm3/stm32/f4/flash.h>
 #include <libopencm3/stm32/exti.h>
@@ -663,6 +664,13 @@ int main(void)
         flash_serial('E', 'E', '0', '0');
     }
 
+    // 1ms tick
+    systick_set_reload(168000);
+    systick_set_clocksource(STK_CTRL_CLKSOURCE_AHB);
+    systick_counter_enable();
+    nvic_set_priority(NVIC_SYSTICK_IRQ, 0xFF);
+    systick_interrupt_enable();
+
     gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9 | GPIO11 | GPIO12);
     gpio_mode_setup(GPIOD, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO15 | GPIO14 | GPIO13 | GPIO12);
     gpio_set_af(GPIOA, GPIO_AF10, GPIO9 | GPIO11 | GPIO12);
@@ -835,5 +843,49 @@ void adc_isr()
 
             adc_enable_eoc_interrupt(adcs[i]);
         }
+    }
+}
+
+int milliseconds = 0;
+
+void sys_tick_handler()
+{
+    int state = 0;
+    int flash=0;
+
+    milliseconds++;
+
+    // Compute state
+    if(m_points[0].running || m_points[1].running || m_points[2].running || m_points[3].running)
+    {
+        state = 1;
+        if(m_points[0].running)
+            flash |= GPIO12;
+        if(m_points[1].running)
+            flash |= GPIO13;
+        if(m_points[2].running)
+            flash |= GPIO14;
+        if(m_points[3].running)
+            flash |= GPIO15;
+    }
+
+    if(state == 0)
+    {
+        gpio_clear(GPIOD, GPIO12 | GPIO13 | GPIO14 | GPIO15);
+        if(milliseconds % 400 < 100)
+            gpio_set(GPIOD, GPIO12);
+        else if(milliseconds % 400 < 200)
+            gpio_set(GPIOD, GPIO13);
+        else if(milliseconds % 400 < 300)
+            gpio_set(GPIOD, GPIO14);
+        else
+            gpio_set(GPIOD, GPIO15);
+    }
+    else if(state == 1)
+    {
+        if(milliseconds % 200 < 100)
+            gpio_set(GPIOD, flash);
+        else
+            gpio_clear(GPIOD, GPIO12 | GPIO13 | GPIO14 | GPIO15);
     }
 }
