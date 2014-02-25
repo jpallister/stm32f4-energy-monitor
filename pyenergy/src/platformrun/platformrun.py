@@ -242,20 +242,7 @@ def pic32mx250f128b(fname):
     os.unlink(tf.name)
     return finishMeasurement("pic32mx250f128b", em)
 
-
-def main():
-    arguments = docopt(__doc__)
-
-    logging.basicConfig()
-
-    if arguments['--verbose'] == 1:
-        logging.getLogger('').setLevel(logging.INFO)
-    elif arguments['--verbose']== 2:
-        logging.getLogger('').setLevel(logging.DEBUG)
-
-    loadConfiguration(arguments['--config'])
-    loadToolConfiguration(arguments['--tools'])
-
+def run(platformname, execname):
     if arguments['PLATFORM'] == "stm32f0discovery":
         m = stm32f0discovery(arguments['EXECUTABLE'])
     elif arguments['PLATFORM'] == "stm32vldiscovery":
@@ -272,6 +259,22 @@ def main():
         m = sam4lxplained(arguments['EXECUTABLE'])
     else:
         raise RuntimeError("Unknown platform " + arguments['PLATFORM'])
+    return m
+
+def main():
+    arguments = docopt(__doc__)
+
+    logging.basicConfig()
+
+    if arguments['--verbose'] == 1:
+        logging.getLogger('').setLevel(logging.INFO)
+    elif arguments['--verbose']== 2:
+        logging.getLogger('').setLevel(logging.DEBUG)
+
+    loadConfiguration(arguments['--config'])
+    loadToolConfiguration(arguments['--tools'])
+
+    m = run(arguments['PLATFORM'], arguments['EXECUTABLE'])
 
     print "Energy:          {}J".format(prettyPrint(m.energy))
     print "Time:            {}s".format(prettyPrint(m.time))
