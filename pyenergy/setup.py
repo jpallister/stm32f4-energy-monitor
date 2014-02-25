@@ -16,7 +16,7 @@ setup(
     package_dir={'':'src'},
     packages=['pyenergy', 'platformrun'],
     long_description=read('README.rst'),
-    install_requires=['pyusb>=1.0.0', 'docopt>=0.6.1'],
+    install_requires=['pyusb>=1.0.0b1', 'docopt>=0.6.1'],
     zip_safe=True,
     entry_points = {
         'console_scripts': [

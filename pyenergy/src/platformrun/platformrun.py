@@ -46,6 +46,9 @@ measurement_config = None
 
 #######################################################################
 
+class CommandError(RuntimeError):
+    pass
+
 def gdb_launch(gdbname, port, fname):
     if logger.getEffectiveLevel() == logging.DEBUG:
         silence = "-batch"
@@ -112,6 +115,9 @@ def foreground_proc(cmd):
             err =''
         if (out == '' or err == '') and p.poll() != None:
             break
+
+    if p.returncode != 0:
+        raise CommandError("Command \"{}\" returned {}".format())
 
 
 def setupMeasurement(platform):
@@ -243,22 +249,26 @@ def pic32mx250f128b(fname):
     return finishMeasurement("pic32mx250f128b", em)
 
 def run(platformname, execname):
-    if arguments['PLATFORM'] == "stm32f0discovery":
-        m = stm32f0discovery(arguments['EXECUTABLE'])
-    elif arguments['PLATFORM'] == "stm32vldiscovery":
-        m = stm32vldiscovery(arguments['EXECUTABLE'])
-    elif arguments['PLATFORM'] == "atmega328p":
-        m = atmega328p(arguments['EXECUTABLE'])
-    elif arguments['PLATFORM'] == "pic32mx250f128b":
-        m = pic32mx250f128b(arguments['EXECUTABLE'])
-    elif arguments['PLATFORM'] == "msp-exp430f5529":
-        m = mspexp430f5529(arguments['EXECUTABLE'])
-    elif arguments['PLATFORM'] == "msp-exp430fr5739":
-        m = mspexp430fr5739(arguments['EXECUTABLE'])
-    elif arguments['PLATFORM'] == "sam4lxplained":
-        m = sam4lxplained(arguments['EXECUTABLE'])
+
+    if not os.path.exists(execname):
+        raise IOError("File \"{}\" does not exist".format(execname))
+
+    if platformname == "stm32f0discovery":
+        m = stm32f0discovery(execname)
+    elif platformname == "stm32vldiscovery":
+        m = stm32vldiscovery(execname)
+    elif platformname == "atmega328p":
+        m = atmega328p(execname)
+    elif platformname == "pic32mx250f128b":
+        m = pic32mx250f128b(execname)
+    elif platformname == "msp-exp430f5529":
+        m = mspexp430f5529(execname)
+    elif platformname == "msp-exp430fr5739":
+        m = mspexp430fr5739(execname)
+    elif platformname == "sam4lxplained":
+        m = sam4lxplained(execname)
     else:
-        raise RuntimeError("Unknown platform " + arguments['PLATFORM'])
+        raise RuntimeError("Unknown platform " + platformname)
     return m
 
 def main():
@@ -274,11 +284,15 @@ def main():
     loadConfiguration(arguments['--config'])
     loadToolConfiguration(arguments['--tools'])
 
-    m = run(arguments['PLATFORM'], arguments['EXECUTABLE'])
+    try:
+        m = run(arguments['PLATFORM'], arguments['EXECUTABLE'])
+    except (IOError, RuntimeError) as e:
+        print "Error:",e
+        quit(1)
 
     print "Energy:          {}J".format(prettyPrint(m.energy))
     print "Time:            {}s".format(prettyPrint(m.time))
-#    print "Power:           {}W".format(prettyPrint(m.avg_power))
+    print "Power:           {}W".format(prettyPrint(m.avg_power))
     print "Average current: {}A".format(prettyPrint(m.avg_current))
     print "Average voltage: {}V".format(prettyPrint(m.avg_voltage))
 
