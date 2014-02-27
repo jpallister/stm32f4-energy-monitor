@@ -3,11 +3,12 @@ The pyenergy and platformrun modules
 ====================================
 
 This package contains two modules, pyenergy and platformrun. The first is a
-module which directly interfaces with the `MAGEEC <http://www.mageec.org>`_ energy monitor boards,
-allowing measurements to be taken and the boards to be scripted. The second
-module, platformrun, allows easy measurement of binaries on platforms that can
-be measured with the boards. The procedure for running a binary is different
-for each boards, so module wraps the platforms in a consistent way.
+module which directly interfaces with the `MAGEEC <http://www.mageec.org>`_
+energy monitor boards, allowing measurements to be taken and the boards to be
+scripted. The second module, platformrun, allows easy measurement of binaries
+on platforms that can be measured with the boards. The procedure for running a
+binary is different for each boards, so module wraps the platforms in a
+consistent way.
 
 Pyenergy
 ========
@@ -146,6 +147,19 @@ Prerequisites for running:
  - arm-none-eabi-gdb (or other arm gdb-compatible debugger)
 
 
+STM32VLDISCOVERY
+~~~~~~~~~~~~~~~~
+
+This board contains a cortex-m3. Stlink is used as a gdb-server and an arm
+debugger is used to flash the code to the board.
+
+Platform name: ``stm32vldiscovery``
+
+Prerequisites for running:
+ - st-util (st-link package)
+ - arm-none-eabi-gdb (or other arm gdb-compatible debugger)
+
+
 ATMEGA328P
 ~~~~~~~~~~
 
@@ -172,6 +186,45 @@ Platform name: ``pic32mx250f128b``
 Prerequisites for running:
  - pic32prog
  - pic32-objcopy
+
+
+MSP-EXP430F5529
+~~~~~~~~~~~~~~~
+
+This is a 16-bit MSP430 DSP from TI, experimenter board, launchpad edition.
+The mspdebug program is used to program this board, however the libmsp430
+needs to be compiled into the mspdebug program.
+
+Platform name: ``msp-exp430f5529``
+
+Prerequisites for running:
+ - mspdebug, with tilib
+
+
+MSP-EXP430FR5739
+~~~~~~~~~~~~~~~~
+
+This is a 16-bit MSP430 DSP from TI, experimenter board. This is similar to
+the previous board, however this chip uses FRAM instead of flash. The mspdebug
+program is used to program this board.
+
+Platform name: ``msp-exp430fr5739``
+
+Prerequisites for running:
+ - mspdebug
+
+
+SAM4L Xplained Pro
+~~~~~~~~~~~~~~~~~~
+
+This is Cortex-M4 chip with an Atmel SoC. The chip can be programmed uses
+CMSIS-DAP, with openocd.
+
+Platform name: ``sam4lxplained``
+
+Prerequisites for running:
+ - arm-none-eabi-gdb
+ - openocd, with CMSIS-DAP compiled in
 
 
 Measurement configuration
