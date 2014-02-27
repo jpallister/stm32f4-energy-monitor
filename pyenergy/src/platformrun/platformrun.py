@@ -65,7 +65,7 @@ def gdb_launch(gdbname, port, fname):
                   -ex "continue" \
                   -ex "quit" \
                   {fname}'.format(**locals())
-    os.system(cmdline)
+    foreground_proc(cmdline)
 
 def background_proc(cmd, stdout=None, stderr=None):
 
@@ -175,7 +175,7 @@ def loadToolConfiguration(fname="~/.platformrunrc"):
 def stm32f0discovery(fname):
     em = setupMeasurement("stm32f0discovery")
 
-    stproc = background_proc(tool_config['tools']['stutil'] + " -p 2001 -c 0x0bb11477 -v0")
+    stproc = background_proc(tool_config['tools']['stutil'] + " -s 2 -p 2001 -c 0x0bb11477 -v0")
     gdb_launch(tool_config['tools']['arm_gdb'], 2001, fname)
     kill_background_proc(stproc)
 
@@ -185,7 +185,7 @@ def stm32f0discovery(fname):
 def stm32vldiscovery(fname):
     em = setupMeasurement("stm32vldiscovery")
 
-    stproc = background_proc(tool_config['tools']['stutil'] + " -p 2002 -c 0x1ba01477 -v0")
+    stproc = background_proc(tool_config['tools']['stutil'] + " -s 1 -p 2002 -c 0x1ba01477 -v0")
     gdb_launch(tool_config['tools']['arm_gdb'], 2002, fname)
     kill_background_proc(stproc)
 

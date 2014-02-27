@@ -26,7 +26,8 @@ default_config = {
         'avrdude' : "avrdude",
         'pic32_objcopy' : 'pic32-objcopy',
         'pic32prog' : 'pic32prog',
-        'mspdebug': 'mspdebug'
+        'mspdebug': 'mspdebug',
+        'openocd': 'openocd',
     },
     'platforms': {
         'stm32f0discovery': ['arm_gdb', 'stutil'],
@@ -35,6 +36,7 @@ default_config = {
         'pic32mx250f128b': ['pic32_objcopy', 'pic32prog'],
         'msp-exp430f5529' : ['mspdebug'],
         'msp-exp430fr5739' : ['mspdebug'],
+        'sam4lxplained' : ['arm_gdb','openocd'],
     },
     'enabled': []
 }
@@ -165,7 +167,10 @@ def main():
 
     # Try and detect if the programs exist
     for tool, name in default_config['tools'].items():
-        if not isinstance(config['tools'][tool], str) and not isinstance(config['tools'][tool], unicode):
+        try:
+            if not isinstance(config['tools'][tool], str) and not isinstance(config['tools'][tool], unicode):
+                config['tools'][tool] = default_config['tools'][tool]
+        except KeyError:
             config['tools'][tool] = default_config['tools'][tool]
         config['tools'][tool] = detect_prog(config['tools'][tool], prompt=arguments['--prompt'])
 
