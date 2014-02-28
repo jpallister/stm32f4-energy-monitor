@@ -18,6 +18,7 @@ Options:
                         stm32f0discovery
                         stm32vldiscovery
                         atmega328p
+                        atxmega256a3bu
                         msp-exp430f5529
                         msp-exp430fr5739
                         pic32mx250f128b
@@ -218,6 +219,31 @@ def atmega328p(fname):
         pass
     return finishMeasurement("atmega328p", em)
 
+def atxmega256a3bu(fname):
+    em = setupMeasurement("atxmega256a3bu")
+
+    # Create temporary file and convert to hex file
+    tf = tempfile.NamedTemporaryFile(delete=False)
+    tf.close()
+    foreground_proc("{} -O ihex {} {}".format(tool_config['tools']['avr_objcopy'], fname, tf.name))
+
+    # Flash the hex file to the AVR chip
+    if logger.getEffectiveLevel() == logging.DEBUG:
+        silence = ""
+    elif logger.getEffectiveLevel() == logging.INFO:
+        silence = "-q"
+    else:
+        silence = "-q -q"
+
+    cmdline = "{} -F -V -c jtag3 -p x256a3bu -e -U flash:w:{}".format(tool_config['tools']['avrdude'], tf.name)
+    foreground_proc(cmdline)
+
+    try:
+        os.unlink(tf.name)
+    except OSError:
+        pass
+    return finishMeasurement("atxmega256a3bu", em)
+
 
 def mspexp430f5529(fname):
     em = setupMeasurement("msp-exp430f5529")
@@ -259,6 +285,8 @@ def run(platformname, execname):
         m = stm32vldiscovery(execname)
     elif platformname == "atmega328p":
         m = atmega328p(execname)
+    elif platformname == "atxmega256a3bu":
+        m = atxmega256a3bu(execname)
     elif platformname == "pic32mx250f128b":
         m = pic32mx250f128b(execname)
     elif platformname == "msp-exp430f5529":
