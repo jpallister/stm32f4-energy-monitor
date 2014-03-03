@@ -1,5 +1,1 @@
-
 ATTRS{idVendor}=="f539", ATTRS{idProduct}=="f539", MODE="0666", GROUP="plugdev"
-
-# JTAGICE3
-SUBSYSTEM=="usb", ATTRS{idVendor}=="03eb", ATTRS{idProduct}=="2110", MODE="0666"
