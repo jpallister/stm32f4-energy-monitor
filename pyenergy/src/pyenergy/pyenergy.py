@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 warning = logger.warning
 error = logger.error
+info = logger.info
 
 
 # import multiprocessing
@@ -117,6 +118,7 @@ class EnergyMonitor(object):
     # Connect to the device
     def connect(self):
         """Connect to the specified board, and check firmware version"""
+        info("Connecting to energy monitor")
         self.dev.set_configuration()
         self.version = self.getVersion(self)
 
@@ -248,6 +250,7 @@ class EnergyMonitor(object):
         """
 
         # TODO check port is of the form PA0
+        info("Set trigger on {}".format(port))
         self.dev.ctrl_transfer(0x41, 4, ord(port[1]) | (m_point<<8), int(port[2]), None)
 
     # Enable a particular measurement point. There are
@@ -282,6 +285,7 @@ class EnergyMonitor(object):
                 adc = self.adcMpoint.index(None)
         if m_point in [3,4] and adc == 2:
             raise RuntimeError("Measurement point {} cannot be used with ADC3 (the only free ADC)".format(m_point))
+        info("Measurement point {} mapped to ADC {}".format(m_point, adc))
         self.adcMpoint[adc] = m_point
         self.dev.ctrl_transfer(0x41, 7, int(m_point), adc, None)
 
@@ -295,6 +299,8 @@ class EnergyMonitor(object):
             We also send a stop command, to ensure no further measurements are
             taken.
         """
+
+        info("Disable measurement point {}".format(m_point))
 
         if m_point not in self.adcMpoint:
             warning("Tried to disable already disabled measurement point "+str(m_point))
@@ -329,8 +335,11 @@ class EnergyMonitor(object):
             point.
         """
 
+        info("getMeasurement")
         b = self.dev.ctrl_transfer(0xc1, 6, int(m_point), 0, calcsize(EnergyMonitor.MeasurementData_packing))
         u = EnergyMonitor.MeasurementData._make(unpack(EnergyMonitor.MeasurementData_packing, b))
+
+        info(u)
 
         return self.convertData(u, samplePeriod=self.samplePeriod, **self.measurement_params[m_point])
 
