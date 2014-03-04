@@ -156,7 +156,7 @@ def setupMeasurement(platform):
     em.connect()
     em.enableMeasurementPoint(mp)
     em.clearNumberOfRuns(mp)
-    em.measurement_params[mp]['resistor'] = int(measurement_config[platform]['resistor'])
+    em.measurement_params[mp]['resistor'] = float(measurement_config[platform]['resistor'])
     em.setTrigger(measurement_config[platform]['trigger-pin'], mp)
 
     return em
