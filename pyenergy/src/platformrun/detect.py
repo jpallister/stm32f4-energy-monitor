@@ -183,6 +183,9 @@ def main():
             if config['tools'][tool] is None:
                 haveTools = False
 
+        if platform not in config['platforms']:
+            config['platforms'][platform] = default_config['platforms'][platform]
+
         if haveTools:
             config['enabled'].append(platform)
 

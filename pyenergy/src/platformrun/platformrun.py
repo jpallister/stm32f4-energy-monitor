@@ -148,8 +148,16 @@ def foreground_proc(cmd, expected_returncode=0):
 
     proc.expect(pexpect.EOF)
 
+    # Even though we have received an EOF, the process may not be
+    # fully dead. Therefore, we wait. An exception is raised if the
+    # process is already dead
+    try:
+        proc.wait()
+    except pexpect.ExceptionPexpect:
+        pass
+
     if expected_returncode is not None and proc.exitstatus != expected_returncode:
-        raise CommandError("Command \"{}\" returned {}".format())
+        raise CommandError("Command \"{}\" returned {}".format(cmd, proc.exitstatus))
 
 
 def setupMeasurement(platform):
