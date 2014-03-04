@@ -64,7 +64,7 @@ class LogWriter(object):
     def close(self):
         pass
 
-def gdb_launch(gdbname, port, fname, run_timeout=10):
+def gdb_launch(gdbname, port, fname, run_timeout=10, post_commands=[]):
     info("Starting+connecting to gdb and loading file")
 
     gdblogger = logger.getChild(os.path.split(gdbname)[-1])
@@ -106,7 +106,13 @@ def gdb_launch(gdbname, port, fname, run_timeout=10):
     gdb.expect(r'Continuing.*\n')
     gdb.expect(r'.*Breakpoint.*exit.*\n', timeout=run_timeout)
 
-    info("Breakpoint hit, quitting GDB")
+    info("Breakpoint hit")
+
+    for cmd in post_commands:
+        gdb.sendline(cmd)
+        gdb.expect(r'.*\(gdb\) ')
+
+    info("Quitting GDB")
     gdb.sendline("quit")
 
 def background_proc(cmd):
@@ -272,6 +278,17 @@ def pic32mx250f128b(fname):
 
     os.unlink(tf.name)
     return finishMeasurement("pic32mx250f128b", em)
+
+
+def sam4lxplained(fname):
+    em = setupMeasurement("sam4lxplained")
+
+    openocdproc = background_proc(tool_config['tools']['openocd'] + " -f board/atmel_sam4l8_xplained_pro.cfg")
+    gdb_launch(tool_config['tools']['arm_gdb'], 3333, fname, post_commands=["monitor shutdown"])
+    kill_background_proc(openocdproc)
+
+    return finishMeasurement("sam4lxplained", em)
+
 
 def run(platformname, execname):
 
