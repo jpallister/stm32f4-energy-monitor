@@ -33,6 +33,7 @@ default_config = {
         'stm32f0discovery': ['arm_gdb', 'stutil'],
         'stm32vldiscovery': ['arm_gdb', 'stutil'],
         'atmega328p': ['avr_objcopy', 'avrdude'],
+        'atxmega256a3bu': ['avr_objcopy', 'avrdude'],
         'pic32mx250f128b': ['pic32_objcopy', 'pic32prog'],
         'msp-exp430f5529' : ['mspdebug'],
         'msp-exp430fr5739' : ['mspdebug'],
