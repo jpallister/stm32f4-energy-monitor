@@ -36,8 +36,11 @@ import pyenergy
 from time import sleep
 import logging
 
+import pexpect, sys
+
 logger = logging.getLogger(__name__)
 warning = logger.warning
+info = logger.info
 debug = logger.debug
 
 
@@ -49,43 +52,76 @@ measurement_config = None
 class CommandError(RuntimeError):
     pass
 
-def gdb_launch(gdbname, port, fname):
-    if logger.getEffectiveLevel() == logging.DEBUG:
-        silence = "-batch"
-    else:
-        silence = "-batch-silent"
+class LogWriter(object):
+    def __init__(self, logger, level):
+        self.logger = logger
+        self.level = level
+    def write(self, msg):
+        for s in msg.split('\n'):
+            self.logger.log(self.level, s)
+    def flush(self):
+        pass
+    def close(self):
+        pass
 
-    cmdline = '{gdbname} {silence} -ex "set confirm off" \
-                  -ex "tar ext :{port}" \
-                  -ex "monitor reset halt" \
-                  -ex "load" \
-                  -ex "delete breakpoints" \
-                  -ex "break exit" \
-                  -ex "break _exit" \
-                  -ex "continue" \
-                  -ex "quit" \
-                  {fname}'.format(**locals())
-    foreground_proc(cmdline)
+def gdb_launch(gdbname, port, fname, run_timeout=10):
+    info("Starting+connecting to gdb and loading file")
 
-def background_proc(cmd, stdout=None, stderr=None):
+    gdblogger = logger.getChild(os.path.split(gdbname)[-1])
+    gdb = pexpect.spawn(gdbname, logfile=LogWriter(gdblogger, logging.DEBUG))
+
+    gdb.expect(r".*\(gdb\) ")
+
+    gdb.sendline("set confirm off")
+    gdb.expect(r".*\(gdb\) ")
+
+    gdb.sendline("target extended :{}".format(port))
+    gdb.expect(r'Remote debugging using.*\n')
+    gdb.expect(r'.*\n')
+    gdb.expect(r".*\(gdb\) ")
+
+    gdb.sendline("file {}".format(fname))
+    gdb.expect(r'Reading symbols.*\n')
+    gdb.expect(r".*\(gdb\) ")
+
+    gdb.sendline("load")
+    while gdb.expect([r'Loading section.*\n',r'Start address.*\n']) == 0:
+        pass
+    gdb.expect(r'Transfer rate.*\n')
+    gdb.expect(r'\(gdb\) ')
+
+    gdb.sendline("delete breakpoints")
+    gdb.expect(r".*\(gdb\) ")
+
+    gdb.sendline("break exit")
+    gdb.expect(r'.*Breakpoint .*\n')
+    gdb.expect(r".*\(gdb\) ")
+
+    gdb.sendline("break _exit")
+    gdb.expect(r'.*Breakpoint .*\n')
+    gdb.expect(r".*\(gdb\) ")
+
+    info("Sending continue to gdb")
+    gdb.sendline("continue")
+    gdb.expect(r'Continuing.*\n')
+    gdb.expect(r'.*Breakpoint.*exit.*\n', timeout=run_timeout)
+
+    info("Breakpoint hit, quitting GDB")
+    gdb.sendline("quit")
+
+def background_proc(cmd):
 
     def run_proc(ev):
-        debug("Starting background proc: \"{}\"".format(cmd))
-        if logger.getEffectiveLevel() == logging.DEBUG:
-            p = subprocess.Popen(cmd, shell=True)
-        else:
-            p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        info("Starting background proc: \"{}\"".format(cmd))
+
+        proclogger = logger.getChild(os.path.split(cmd.split(' ')[0])[-1])
+        proc = pexpect.spawn(cmd, logfile=LogWriter(proclogger, logging.DEBUG))
+
         while not ev.isSet():
-            if logger.getEffectiveLevel() == logging.DEBUG:
-                out = p.stdout.read(1)
-                err = p.stderr.read(1)
-            else:
-                out = err = ''
-            if (out == '' or err == '') and p.poll() != None:
-                break
-            ev.wait(0.1)
-        debug("Killing background proc: \"{}\"".format(cmd))
-        p.kill()
+            proc.expect([r'.*\n', pexpect.EOF])
+
+        info("Killing background proc: \"{}\"".format(cmd))
+        proc.kill(15)
 
     ev = threading.Event()
     t = threading.Thread(target=run_proc, args=(ev,))
@@ -96,27 +132,16 @@ def background_proc(cmd, stdout=None, stderr=None):
 def kill_background_proc(p):
     p.set()
 
-def foreground_proc(cmd):
-    debug("Starting foreground proc: \"{}\"".format(cmd))
-    if logger.getEffectiveLevel() == logging.DEBUG:
-        p = subprocess.Popen(cmd, shell=True)
-    else:
-        p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+def foreground_proc(cmd, expected_returncode=0):
+    info("Starting foreground proc: \"{}\"".format(cmd))
 
-    while True:
-        if logger.getEffectiveLevel() == logging.DEBUG and p.stdout:
-            out = p.stdout.read(1)
-        else:
-            out = ''
+    proclogger = logger.getChild(cmd.split(' ')[0])
 
-        if logger.getEffectiveLevel() == logging.DEBUG and p.stderr:
-            err = p.stderr.read(1)
-        else:
-            err =''
-        if (out == '' or err == '') and p.poll() != None:
-            break
+    proc = pexpect.spawn(cmd, logfile=LogWriter(proclogger, logging.DEBUG))
 
-    if p.returncode != 0:
+    proc.expect(pexpect.EOF)
+
+    if expected_returncode is not None and proc.exitstatus != expected_returncode:
         raise CommandError("Command \"{}\" returned {}".format())
 
 
