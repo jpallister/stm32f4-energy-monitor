@@ -18,7 +18,7 @@ Options:
                         stm32f0discovery
                         stm32vldiscovery
                         atmega328p
-                        atxmega256a3bu
+                        xmegaa3buxplained
                         msp-exp430f5529
                         msp-exp430fr5739
                         pic32mx250f128b
@@ -250,8 +250,8 @@ def atmega328p(fname):
         pass
     return finishMeasurement("atmega328p", em)
 
-def atxmega256a3bu(fname):
-    em = setupMeasurement("atxmega256a3bu")
+def xmegaa3buxplained(fname):
+    em = setupMeasurement("xmegaa3buxplained")
 
     # Create temporary file and convert to hex file
     tf = tempfile.NamedTemporaryFile(delete=False)
@@ -273,7 +273,7 @@ def atxmega256a3bu(fname):
         os.unlink(tf.name)
     except OSError:
         pass
-    return finishMeasurement("atxmega256a3bu", em)
+    return finishMeasurement("xmegaa3buxplained", em)
 
 
 def mspexp430f5529(fname):
@@ -327,8 +327,8 @@ def run(platformname, execname):
         m = stm32vldiscovery(execname)
     elif platformname == "atmega328p":
         m = atmega328p(execname)
-    elif platformname == "atxmega256a3bu":
-        m = atxmega256a3bu(execname)
+    elif platformname == "xmegaa3buxplained":
+        m = xmegaa3buxplained(execname)
     elif platformname == "pic32mx250f128b":
         m = pic32mx250f128b(execname)
     elif platformname == "msp-exp430f5529":
