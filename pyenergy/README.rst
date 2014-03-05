@@ -10,6 +10,9 @@ on platforms that can be measured with the boards. The procedure for running a
 binary is different for each boards, so module wraps the platforms in a
 consistent way.
 
+The source code is available at
+https://github.com/jpallister/stm32f4-energy-monitor/ under the LGPL.
+
 Pyenergy
 ========
 
@@ -225,6 +228,21 @@ Platform name: ``sam4lxplained``
 Prerequisites for running:
  - arm-none-eabi-gdb
  - openocd, with CMSIS-DAP compiled in
+
+
+XMEGA-A3BU Xplained
+~~~~~~~~~~~~~~~~~~~
+
+This board contains one of the larger AVR chips, and is programmed using the
+JTAGICE3 jtag programmer. Note: only the old firmware can communicate with
+avrdude, if the programmer has been updated by Atmel Studio then it will not
+work.
+
+Platform name: ``xmegaa3buxplained``
+
+Prerequisites for running:
+ - avr-objcopy
+ - avrdude
 
 
 Measurement configuration
