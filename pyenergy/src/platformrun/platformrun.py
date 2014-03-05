@@ -65,7 +65,7 @@ class LogWriter(object):
     def close(self):
         pass
 
-def gdb_launch(gdbname, port, fname, run_timeout=10, post_commands=[]):
+def gdb_launch(gdbname, port, fname, run_timeout=30, post_commands=[]):
     info("Starting+connecting to gdb and loading file")
 
     gdblogger = logger.getChild(os.path.split(gdbname)[-1])
@@ -81,6 +81,7 @@ def gdb_launch(gdbname, port, fname, run_timeout=10, post_commands=[]):
     gdb.expect(r'.*\n')
     gdb.expect(r".*\(gdb\) ")
 
+    info("load file {}".format(fname))
     gdb.sendline("file {}".format(fname))
     gdb.expect(r'Reading symbols.*\n')
     gdb.expect(r".*\(gdb\) ")
@@ -326,7 +327,7 @@ def sam4lxplained(fname):
 
 def run(platformname, execname):
 
-    if not os.path.exists(execname):
+    if not os.path.isfile(execname):
         raise IOError("File \"{}\" does not exist".format(execname))
 
     if platformname == "stm32f0discovery":
