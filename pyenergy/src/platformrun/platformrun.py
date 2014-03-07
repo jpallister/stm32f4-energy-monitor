@@ -38,7 +38,7 @@ import pyenergy
 from time import sleep
 import logging
 
-import pexpect, sys
+import pexpect, sys, copy
 
 logger = logging.getLogger(__name__)
 warning = logger.warning
@@ -118,6 +118,8 @@ def gdb_launch(gdbname, port, fname, run_timeout=30, post_commands=[]):
     info("Quitting GDB")
     gdb.sendline("quit")
 
+bg_procs = []
+
 def background_proc(cmd):
 
     def run_proc(ev):
@@ -127,7 +129,7 @@ def background_proc(cmd):
         proc = pexpect.spawn(cmd, logfile=LogWriter(proclogger, logging.DEBUG))
 
         while not ev.isSet():
-            proc.expect([r'.*\n', pexpect.EOF])
+            proc.expect([r'.*\n', pexpect.EOF, pexpect.TIMEOUT], timeout=1)
 
         info("Killing background proc: \"{}\"".format(cmd))
         proc.kill(15)
@@ -136,10 +138,25 @@ def background_proc(cmd):
     t = threading.Thread(target=run_proc, args=(ev,))
     t.start()
 
+    bg_procs.append(ev)
+
     return ev
 
 def kill_background_proc(p):
     p.set()
+    bg_procs.remove(p)
+
+def killBgOnCtrlC(f):
+    def wrap(platform, measurement):
+        try:
+            return f(platform, measurement)
+        except KeyboardInterrupt:
+            info("Keyboard interrupt, killing background procs")
+            for p in copy.copy(bg_procs):
+                kill_background_proc(p)
+            raise
+    return wrap
+
 
 def foreground_proc(cmd, expected_returncode=0):
     info("Starting foreground proc: \"{}\"".format(cmd))
@@ -160,6 +177,7 @@ def foreground_proc(cmd, expected_returncode=0):
 
     if expected_returncode is not None and proc.exitstatus != expected_returncode:
         raise CommandError("Command \"{}\" returned {}".format(cmd, proc.exitstatus))
+    info("Foreground proc complete")
 
 
 def setupMeasurement(platform, doMeasure=True):
@@ -187,8 +205,10 @@ def finishMeasurement(platform, em, doMeasure=True):
 
     mp = int(measurement_config[platform]['measurement-point'])
 
+    info("Waiting for measurement to complete")
     while not em.measurementCompleted(mp):
         sleep(0.1)
+    info("Measurement complete")
     m = em.getMeasurement(mp)
 
     em.disconnect()
@@ -220,6 +240,7 @@ def loadToolConfiguration(fname="~/.platformrunrc"):
 
 #######################################################################
 
+@killBgOnCtrlC
 def stm32f0discovery(fname, doMeasure=True):
     em = setupMeasurement("stm32f0discovery", doMeasure)
 
@@ -230,6 +251,7 @@ def stm32f0discovery(fname, doMeasure=True):
     return finishMeasurement("stm32f0discovery", em, doMeasure)
 
 
+@killBgOnCtrlC
 def stm32vldiscovery(fname, doMeasure=True):
     em = setupMeasurement("stm32vldiscovery", doMeasure)
 
@@ -322,6 +344,7 @@ def pic32mx250f128b(fname, doMeasure=True):
     return finishMeasurement("pic32mx250f128b", em, doMeasure)
 
 
+@killBgOnCtrlC
 def sam4lxplained(fname, doMeasure=True):
     em = setupMeasurement("sam4lxplained", doMeasure)
 
