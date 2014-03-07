@@ -10,7 +10,7 @@ setup(
     author = "James Pallister",
     author_email = "james.pallister@bristol.ac.uk",
     description = ("An interface to the MAGEEC energy monitor boards"),
-    license = "GPLv3",
+    license = "LGPL",
     keywords = "energy monitor MAGEEC",
     # url = "http://packages.python.org/an_example_pypi_project",
     package_dir={'':'src'},
