@@ -12,6 +12,7 @@ Options:
     -t --tools CONF     Config file for the tools needed to run on a platform
                             [default: ~/.platformrunrc]
     -v --verbose        Be verbose
+    --no-measure        Don't measure anything
 
     PLATFORM        Specify the platform on which to run.
                     Available platforms are:
@@ -161,7 +162,10 @@ def foreground_proc(cmd, expected_returncode=0):
         raise CommandError("Command \"{}\" returned {}".format(cmd, proc.exitstatus))
 
 
-def setupMeasurement(platform):
+def setupMeasurement(platform, doMeasure=True):
+    if not doMeasure:
+        return None
+
     # First check that all tools for platform are available
     if platform not in tool_config['enabled']:
         raise RuntimeError("Platform {0} does not have all the tools configured. Please rerun configure with --enable-{0}".format(platform))
@@ -177,7 +181,10 @@ def setupMeasurement(platform):
 
     return em
 
-def finishMeasurement(platform, em):
+def finishMeasurement(platform, em, doMeasure=True):
+    if not doMeasure:
+        return None
+
     mp = int(measurement_config[platform]['measurement-point'])
 
     while not em.measurementCompleted(mp):
@@ -213,28 +220,28 @@ def loadToolConfiguration(fname="~/.platformrunrc"):
 
 #######################################################################
 
-def stm32f0discovery(fname):
-    em = setupMeasurement("stm32f0discovery")
+def stm32f0discovery(fname, doMeasure=True):
+    em = setupMeasurement("stm32f0discovery", doMeasure)
 
     stproc = background_proc(tool_config['tools']['stutil'] + " -s 2 -p 2001 -c 0x0bb11477 -v0")
     gdb_launch(tool_config['tools']['arm_gdb'], 2001, fname)
     kill_background_proc(stproc)
 
-    return finishMeasurement("stm32f0discovery", em)
+    return finishMeasurement("stm32f0discovery", em, doMeasure)
 
 
-def stm32vldiscovery(fname):
-    em = setupMeasurement("stm32vldiscovery")
+def stm32vldiscovery(fname, doMeasure=True):
+    em = setupMeasurement("stm32vldiscovery", doMeasure)
 
     stproc = background_proc(tool_config['tools']['stutil'] + " -s 1 -p 2002 -c 0x1ba01477 -v0")
     gdb_launch(tool_config['tools']['arm_gdb'], 2002, fname)
     kill_background_proc(stproc)
 
-    return finishMeasurement("stm32vldiscovery", em)
+    return finishMeasurement("stm32vldiscovery", em, doMeasure)
 
 
-def atmega328p(fname):
-    em = setupMeasurement("atmega328p")
+def atmega328p(fname, doMeasure=True):
+    em = setupMeasurement("atmega328p", doMeasure)
 
     # Create temporary file and convert to hex file
     tf = tempfile.NamedTemporaryFile(delete=False)
@@ -257,10 +264,10 @@ def atmega328p(fname):
         os.unlink(tf.name)
     except OSError:
         pass
-    return finishMeasurement("atmega328p", em)
+    return finishMeasurement("atmega328p", em, doMeasure)
 
-def xmegaa3buxplained(fname):
-    em = setupMeasurement("xmegaa3buxplained")
+def xmegaa3buxplained(fname, doMeasure=True):
+    em = setupMeasurement("xmegaa3buxplained", doMeasure)
 
     # Create temporary file and convert to hex file
     tf = tempfile.NamedTemporaryFile(delete=False)
@@ -282,27 +289,27 @@ def xmegaa3buxplained(fname):
         os.unlink(tf.name)
     except OSError:
         pass
-    return finishMeasurement("xmegaa3buxplained", em)
+    return finishMeasurement("xmegaa3buxplained", em, doMeasure)
 
 
-def mspexp430f5529(fname):
-    em = setupMeasurement("msp-exp430f5529")
+def mspexp430f5529(fname, doMeasure=True):
+    em = setupMeasurement("msp-exp430f5529", doMeasure)
 
     foreground_proc("{} tilib -q \"prog {}\" &".format(tool_config['tools']['mspdebug'], fname))
 
-    return finishMeasurement("msp-exp430f5529", em)
+    return finishMeasurement("msp-exp430f5529", em, doMeasure)
 
 
-def mspexp430fr5739(fname):
-    em = setupMeasurement("msp-exp430fr5739")
+def mspexp430fr5739(fname, doMeasure=True):
+    em = setupMeasurement("msp-exp430fr5739", doMeasure)
 
     foreground_proc("{} rf2500 -q \"prog {}\" &".format(tool_config['tools']['mspdebug'], fname))
 
-    return finishMeasurement("msp-exp430fr5739", em)
+    return finishMeasurement("msp-exp430fr5739", em, doMeasure)
 
 
-def pic32mx250f128b(fname):
-    # Create temporary file and convert to hex file
+def pic32mx250f128b(fname, doMeasure=True):
+    # Create temporary file and convert to hex fil, doMeasuree
     tf = tempfile.NamedTemporaryFile(delete=False)
     tf.close()
     foreground_proc("{} -O ihex {} {}".format(tool_config['tools']['pic32_objcopy'], fname, tf.name))
@@ -312,40 +319,40 @@ def pic32mx250f128b(fname):
     foreground_proc("{} -p {}".format(tool_config['tools']['pic32prog'], tf.name))
 
     os.unlink(tf.name)
-    return finishMeasurement("pic32mx250f128b", em)
+    return finishMeasurement("pic32mx250f128b", em, doMeasure)
 
 
-def sam4lxplained(fname):
-    em = setupMeasurement("sam4lxplained")
+def sam4lxplained(fname, doMeasure=True):
+    em = setupMeasurement("sam4lxplained", doMeasure)
 
     openocdproc = background_proc(tool_config['tools']['openocd'] + " -f board/atmel_sam4l8_xplained_pro.cfg")
     gdb_launch(tool_config['tools']['arm_gdb'], 3333, fname, post_commands=["monitor shutdown"])
     kill_background_proc(openocdproc)
 
-    return finishMeasurement("sam4lxplained", em)
+    return finishMeasurement("sam4lxplained", em, doMeasure)
 
 
-def run(platformname, execname):
+def run(platformname, execname, measurement=True):
 
     if not os.path.isfile(execname):
         raise IOError("File \"{}\" does not exist".format(execname))
 
     if platformname == "stm32f0discovery":
-        m = stm32f0discovery(execname)
+        m = stm32f0discovery(execname, measurement)
     elif platformname == "stm32vldiscovery":
-        m = stm32vldiscovery(execname)
+        m = stm32vldiscovery(execname, measurement)
     elif platformname == "atmega328p":
-        m = atmega328p(execname)
+        m = atmega328p(execname, measurement)
     elif platformname == "xmegaa3buxplained":
-        m = xmegaa3buxplained(execname)
+        m = xmegaa3buxplained(execname, measurement)
     elif platformname == "pic32mx250f128b":
-        m = pic32mx250f128b(execname)
+        m = pic32mx250f128b(execname, measurement)
     elif platformname == "msp-exp430f5529":
-        m = mspexp430f5529(execname)
+        m = mspexp430f5529(execname, measurement)
     elif platformname == "msp-exp430fr5739":
-        m = mspexp430fr5739(execname)
+        m = mspexp430fr5739(execname, measurement)
     elif platformname == "sam4lxplained":
-        m = sam4lxplained(execname)
+        m = sam4lxplained(execname, measurement)
     else:
         raise RuntimeError("Unknown platform " + platformname)
     return m
@@ -364,16 +371,20 @@ def main():
     loadToolConfiguration(arguments['--tools'])
 
     try:
-        m = run(arguments['PLATFORM'], arguments['EXECUTABLE'])
+        print arguments['--no-measure'] is None
+        m = run(arguments['PLATFORM'],
+                arguments['EXECUTABLE'],
+                arguments['--no-measure'] is None)
     except (IOError, RuntimeError) as e:
         print "Error:",e
         quit(1)
 
-    print "Energy:          {}J".format(prettyPrint(m.energy))
-    print "Time:            {}s".format(prettyPrint(m.time))
-    print "Power:           {}W".format(prettyPrint(m.avg_power))
-    print "Average current: {}A".format(prettyPrint(m.avg_current))
-    print "Average voltage: {}V".format(prettyPrint(m.avg_voltage))
+    if arguments['--no-measure']:
+        print "Energy:          {}J".format(prettyPrint(m.energy))
+        print "Time:            {}s".format(prettyPrint(m.time))
+        print "Power:           {}W".format(prettyPrint(m.avg_power))
+        print "Average current: {}A".format(prettyPrint(m.avg_current))
+        print "Average voltage: {}V".format(prettyPrint(m.avg_voltage))
 
 if __name__ == "__main__":
     main()
