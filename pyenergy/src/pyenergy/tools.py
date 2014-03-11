@@ -7,7 +7,9 @@ Usage:
     energytool (-m MPOINT)... [options] continuous SERIAL
     energytool (-m MPOINT)... [options] debug SERIAL
     energytool list
+    energytool setup
     energytool changeserial SERIAL NEWSERIAL
+    energytool interactive SERIAL
 
 Commands:
     read            This sets up a trigger on the specified PIN and waits for
@@ -22,8 +24,14 @@ Commands:
     list            Show the serial numbers and API version of each connected
                     energy monitor.
 
+    setup           Prompt about the energy measurement configuration and
+                    create a .measurementrc file.
+
     changeserial    Connect to the device specified by SERIAL, and change the
                     serial to NEWSERIAL
+
+    interactive     Start up the interactive graph view, for energy monitor
+                    SERIAL. This requires PyQt4 to be installed.
 
 Options:
     -m --measurement MPOINT     Specify a measurement point to use (up to 3)
@@ -35,6 +43,10 @@ from docopt import docopt
 import pyenergy
 from time import sleep
 import usb.util
+import textwrap, string
+import json, os, os.path
+import platformrun
+import readline
 
 def prettyPrint(v):
     units = ['', 'm', 'u', 'n', 'p']
@@ -151,6 +163,119 @@ def change_serial(oldser, newser):
     em.setSerial(newser)
 
 
+def preinput(text):
+    def f():
+        #stdout.write(blue)
+        readline.insert_text(text)
+        readline.redisplay()
+    return f
+
+def get_input(prompt, initial=""):
+    readline.set_pre_input_hook(preinput(initial))
+    inp = raw_input(prompt)
+    # stdout.write(reset)
+    return inp
+
+def choice(prompt, choices, initial=""):
+    sel = None
+
+    while True:
+        sel = get_input("{} [{}] ".format(prompt, "/".join(choices)), initial=initial)
+        initial = ""
+
+        if sel == '':
+            sel = None
+            for c in choices:
+                if c.isupper():
+                    return c.lower()
+        elif sel.lower() in map(string.lower, choices):
+            return sel.lower()
+
+def setup():
+    list_boards()
+    print ""
+
+    text=textwrap.dedent("""
+        This program will prompt you for the connections between the measurement
+        boards.Necessary information includes the serial of the energy monitor
+        connected to which platform, and which pin is used to trigger the energy
+        data collection.
+
+        This information is stored in the ~/.measurementrc file. The existing
+        config will now be loaded (if there is one), allowing you edit it.
+        """)
+    print text
+
+    cfg = os.path.expanduser("~/.measurementrc")
+    if os.path.exists(cfg):
+        config = json.load(open(cfg))
+    else:
+        print "Configuration file does not exist, creating new config"
+        config = {}
+
+
+    while True:
+        c = choice("[A]dd board, [e]dit/[delete] existing, [f]inished?", "aedf")
+
+        if c == "f":
+            break
+        if c == 'a' or c == "e":
+            if c == "a":
+                all_platforms = set(platformrun.detect.default_config['platforms'].keys())
+                used_platforms = set(config.keys())
+
+                pchoices = list(all_platforms - used_platforms)
+            else:
+                pchoices = list(config.keys())
+
+            pstrchoices = map(lambda (i, s): "\t[{}] {}".format(i, s), enumerate(pchoices))
+            cchoices = "".join(map(str, range(len(pchoices))))
+
+            c1 = choice("Select the platform:\n" + "\n".join(pstrchoices) + "\n ? ", cchoices)
+            c1 = int(c1)
+
+            platform = pchoices[c1]
+
+            if c == "e":
+                default_ser = config[platform]['energy-monitor']
+                default_mp = str(config[platform]['measurement-point'])
+                default_res = str(config[platform]['resistor'])
+            else:
+                default_ser = ""
+                default_mp = ""
+                default_res = ""
+
+            ser = ""
+            while ser == "":
+                ser = get_input("Serial of energy monitor connected to {}: ".format(platform), initial=default_ser)
+            mp  = choice("Measurement point connected to {}".format(platform), ["1", "2", "3" ], initial=default_mp)
+            res = choice("Shunt resistor used: ", ["0.05", "0.5", "1", "5"], initial = default_res)
+
+            config[platform] = {"energy-monitor": str(ser), "measurement-point": int(mp), "resistor": float(res)}
+
+            if platform == "atmega328p":
+                sdi = get_input("ATMEGA328P requires the id of the serial-USB adapter. This can be\nfound in /dev/serial/by-id/\n ? ")
+                config[platform]['serial-dev-id'] = str(sdi)
+
+            print ""
+        if c == 'd':
+            pchoices = list(config.keys())
+
+            pstrchoices = map(lambda (i, s): "\t[{}] {}".format(i, s), enumerate(pchoices))
+            cchoices = "".join(map(str, range(len(pchoices))))
+
+            c1 = choice("Select the platform:\n" + "\n".join(pstrchoices) + "\n ? ", cchoices)
+            c1 = int(c1)
+
+            platform = pchoices[c1]
+            del config[platform]
+
+
+    f = open(cfg, "w")
+    json.dump(config, f)
+    f.close()
+
+
 def main():
     arguments = docopt(__doc__)
 
@@ -164,8 +289,18 @@ def main():
         continuous(arguments['SERIAL'], mpoints, float(arguments['--time']))
     elif arguments['list']:
         list_boards()
+    elif arguments['setup']:
+        setup()
     elif arguments['changeserial']:
         change_serial(arguments['SERIAL'], arguments['NEWSERIAL'])
+    elif arguments['interactive']:
+        try:
+            import PyQt4
+        except ImportError:
+            print "Error: please install PyQt4"
+            quit()
+        import interactive_graph
+        interactive_graph.main(arguments['SERIAL'])
 
 if __name__=="__main__":
     main()

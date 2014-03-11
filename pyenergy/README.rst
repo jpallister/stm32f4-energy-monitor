@@ -13,6 +13,27 @@ consistent way.
 The source code is available at
 https://github.com/jpallister/stm32f4-energy-monitor/ under the LGPL.
 
+Getting started
+===============
+
+The commands that need to be run to just run a binary on a platform:
+
+::
+    $ energytool setup
+
+This command will prompt you for the setup of the energy measurement devices
+that are attached to the computer.
+
+    $ platformrun-detect
+
+This will detect whether the required tools are installed to run on the target
+platform. The ``-p`` flag prompts for locations of binaries, if they are in
+non standard places.
+
+    $ platformrun PLATFORM BINARY
+
+This command runs the binary on the platform, recording energy measurements.
+
 Pyenergy
 ========
 
@@ -35,7 +56,9 @@ the energy monitors.
         energytool (-m MPOINT)... [options] continuous SERIAL
         energytool (-m MPOINT)... [options] debug SERIAL
         energytool list
+        energytool setup
         energytool changeserial SERIAL NEWSERIAL
+        energytool interactive
 
     Commands:
         read            This sets up a trigger on the specified PIN and waits for

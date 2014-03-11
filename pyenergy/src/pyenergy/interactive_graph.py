@@ -429,11 +429,11 @@ class Graph(QMainWindow):
         self.state = state
         self.on_draw()
 
-def main():
+def main(serial):
     app = QApplication(sys.argv)
     app.setStyle("plastique")
 
-    em = pyenergy.EnergyMonitor("MSP0")
+    em = pyenergy.EnergyMonitor(serial)
     em.connect()
 
     form = Graph(em)
@@ -442,4 +442,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main("EE00")
