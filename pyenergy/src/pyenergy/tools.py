@@ -240,18 +240,22 @@ def setup():
                 default_ser = config[platform]['energy-monitor']
                 default_mp = str(config[platform]['measurement-point'])
                 default_res = str(config[platform]['resistor'])
+                default_pin = str(config[platform]['trigger-pin'])
             else:
                 default_ser = ""
                 default_mp = ""
                 default_res = ""
+                default_pin = ""
 
             ser = ""
             while ser == "":
                 ser = get_input("Serial of energy monitor connected to {}: ".format(platform), initial=default_ser)
             mp  = choice("Measurement point connected to {}".format(platform), ["1", "2", "3" ], initial=default_mp)
             res = choice("Shunt resistor used: ", ["0.05", "0.5", "1", "5"], initial = default_res)
+            while pin == "":
+                pin = get_input("Set the trigger pin: ", initial=default_pin)
 
-            config[platform] = {"energy-monitor": str(ser), "measurement-point": int(mp), "resistor": float(res)}
+            config[platform] = {"energy-monitor": str(ser), "measurement-point": int(mp), "resistor": float(res), "trigger-pin": pin}
 
             if platform == "atmega328p":
                 sdi = get_input("ATMEGA328P requires the id of the serial-USB adapter. This can be\nfound in /dev/serial/by-id/\n ? ")

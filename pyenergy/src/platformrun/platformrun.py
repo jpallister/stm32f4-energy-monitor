@@ -394,15 +394,16 @@ def main():
     loadToolConfiguration(arguments['--tools'])
 
     try:
-        print arguments['--no-measure'] is None
+        print arguments['--no-measure'] is False
         m = run(arguments['PLATFORM'],
                 arguments['EXECUTABLE'],
-                arguments['--no-measure'] is None)
+                arguments['--no-measure'] is False)
     except (IOError, RuntimeError) as e:
         print "Error:",e
         quit(1)
 
-    if arguments['--no-measure']:
+    print m, arguments['--no-measure']
+    if arguments['--no-measure'] is False:
         print "Energy:          {}J".format(prettyPrint(m.energy))
         print "Time:            {}s".format(prettyPrint(m.time))
         print "Power:           {}W".format(prettyPrint(m.avg_power))
