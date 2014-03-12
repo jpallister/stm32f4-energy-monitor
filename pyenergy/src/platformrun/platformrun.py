@@ -394,7 +394,6 @@ def main():
     loadToolConfiguration(arguments['--tools'])
 
     try:
-        print arguments['--no-measure'] is False
         m = run(arguments['PLATFORM'],
                 arguments['EXECUTABLE'],
                 arguments['--no-measure'] is False)
@@ -402,7 +401,6 @@ def main():
         print "Error:",e
         quit(1)
 
-    print m, arguments['--no-measure']
     if arguments['--no-measure'] is False:
         print "Energy:          {}J".format(prettyPrint(m.energy))
         print "Time:            {}s".format(prettyPrint(m.time))
