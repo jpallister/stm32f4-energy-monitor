@@ -23,6 +23,7 @@ setup(
             'platformrun = platformrun:main',
             'platformrun-detect = platformrun.detect:main',
             'energytool = pyenergy.tools:main',
+            'measurement-upgrade = pyenergy.upgrade:main',
         ],
         # 'gui_scripts': [
         #     'interactive_graph = pyenergy.interactive_graph:main'
