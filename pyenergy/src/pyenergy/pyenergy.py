@@ -13,6 +13,7 @@ logger.addHandler(logging.NullHandler())
 warning = logger.warning
 error = logger.error
 info = logger.info
+debug = logger.debug
 
 
 # import multiprocessing
@@ -183,9 +184,11 @@ class EnergyMonitor(object):
     # measurements or not
     def isRunning(self, m_point=1):
         """Check whether a particular measurement point is running."""
+        debug("Check if running")
         b = self.dev.ctrl_transfer(0xc1, 8, int(m_point), 0, 4)
 
         running = unpack("=L", b)
+        debug("Running: {0}".format(running))
         return bool(running[0])
 
     # This counts the number of end measurement signals caught
@@ -200,9 +203,11 @@ class EnergyMonitor(object):
             measurement has completed, in measurementComplete.
         """
 
+        debug("Get number of runs")
         b = self.dev.ctrl_transfer(0xc1, 9, int(m_point), 0, 4)
 
         runs = unpack("=L", b)
+        debug("Runs: {0}".format(runs[0]))
         return bool(runs[0])
 
     # Reset the number of runs counts to 0

@@ -38,6 +38,7 @@ Options:
                                 can be specified.
     -t --time TIME              Seconds delay between measurements for
                                 continuous and debug [default: 0.1]
+    -v LEVEL                    Verbosity level: 0, 1 or 2 [default: 0]
 """
 from docopt import docopt
 import pyenergy
@@ -47,6 +48,8 @@ import textwrap, string
 import json, os, os.path
 import platformrun
 import readline
+
+import logging
 
 def prettyPrint(v):
     units = ['', 'm', 'u', 'n', 'p']
@@ -282,6 +285,13 @@ def setup():
 
 def main():
     arguments = docopt(__doc__)
+
+    logging.basicConfig()
+    if arguments['-v'] == "1":
+        logging.getLogger('').setLevel(logging.INFO)
+    if arguments['-v'] == "2":
+        logging.getLogger('').setLevel(logging.DEBUG)
+        logging.debug("test")
 
     mpoints = map(int, set(arguments['--measurement']))
 
