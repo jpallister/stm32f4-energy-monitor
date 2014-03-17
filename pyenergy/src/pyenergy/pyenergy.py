@@ -5,6 +5,7 @@ import usb.util
 from struct import *
 from copy import copy
 from collections import namedtuple
+import operator
 
 import logging
 
@@ -18,7 +19,88 @@ debug = logger.debug
 
 # import multiprocessing
 
-Measurement = namedtuple('Measurement', 'energy time peak_power peak_voltage peak_current n_samples avg_voltage avg_current avg_power')
+class Measurement(object):
+    class_version = 1
+
+    def __init__(self, energy=0, time=0, peak_power=0, peak_voltage=0, peak_current=0,
+                n_samples=0, avg_voltage=0, avg_current=0, avg_power=0):
+        self.energy       = float(energy)
+        self.time         = float(time)
+        self.peak_power   = float(peak_power)
+        self.peak_voltage = float(peak_voltage)
+        self.peak_current = float(peak_current)
+        self.n_samples    = float(n_samples)
+        self.avg_voltage  = float(avg_voltage)
+        self.avg_current  = float(avg_current)
+        self.avg_power    = float(avg_power)
+        self.version      = Measurement.class_version
+
+    def _op_self(self, other, fn):
+        params = ["energy", "time", "peak_power", "peak_voltage", "peak_current",
+                "n_samples", "avg_voltage", "avg_current", "avg_power"]
+        m = Measurement()
+        for p in params:
+            print p
+            print self.__dict__, other.__dict__
+            m.__dict__[p] = fn(self.__dict__[p], other.__dict__[p])
+        return m
+
+    def _op_const(self, const, fn):
+        params = ["energy", "time", "peak_power", "peak_voltage", "peak_current",
+                "n_samples", "avg_voltage", "avg_current", "avg_power"]
+        m = Measurement()
+        for p in params:
+            m.__dict__[p] = fn(self.__dict__[p], const)
+        return m
+
+    def _op(self, other, fn):
+        if isinstance(other, Measurement):
+            return self._op_self(other, fn)
+        else:
+            return self._op_const(other, fn);
+
+    def __add__(self, other):
+        return self._op(other, operator.add)
+    def __sub__(self, other):
+        return self._op(other, operator.sub)
+    def __mul__(self, other):
+        return self._op(other, operator.mul)
+    def __div__(self, other):
+        return self._op(other, operator.div)
+
+    def __radd__(self, other):
+        return self._op(other, operator.add)
+    def __rsub__(self, other):
+        return self._op(other, operator.sub)
+    def __rmul__(self, other):
+        return self._op(other, operator.mul)
+    def __rdiv__(self, other):
+        return self._op(other, operator.div)
+
+    def __repr__(self):
+        return "Measurement(" + ", ".join(map("{0[0]}={0[1]}".format, self.__dict__.items())) + ")"
+
+    # Future proof for new version
+    def __getstate__(self):
+        return self.__dict__
+    def __setstate__(self, d):
+
+        if 'version' not in d or d['version'] < 1:
+            # likely to only happen when we have unversioned data
+            # so lets make this an info message instead of a warning
+            # as we've probably warned about it already
+            info("Upgrading to version 1")
+            d['version'] = 1
+            if "avg_power" not in d:
+                d['avg_power'] = d['energy'] / d['time']
+
+        # In future, if this class gets upgraded, add code here to upgrade from
+        # previous versions
+
+        if d['version'] > self.class_version:
+            error("Measurement was created with a newer version of pyenergy, please upgrade")
+
+        self.__dict__.update(d)
 
 class EnergyMonitor(object):
     """

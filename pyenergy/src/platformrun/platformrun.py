@@ -11,6 +11,7 @@ Options:
                             [default: ~/.measurementrc]
     -t --tools CONF     Config file for the tools needed to run on a platform
                             [default: ~/.platformrunrc]
+    -r --repeat N       Repeat the test N times [default: 1]
     -v --verbose        Be verbose
     --no-measure        Don't measure anything
 
@@ -379,6 +380,16 @@ def run(platformname, execname, measurement=True):
     else:
         raise RuntimeError("Unknown platform " + platformname)
     return m
+
+
+def run_multiple(platformname, execname, repeats, measurement=True):
+    measurements = []
+
+    for i in range(repeats):
+        m = run(platformname, execname, measurement)
+        measurements.append(m)
+
+    return sum(measurements) / len(measurements)
 
 def main():
     arguments = docopt(__doc__)
