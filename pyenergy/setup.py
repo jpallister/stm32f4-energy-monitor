@@ -6,7 +6,7 @@ def read(fname):
 
 setup(
     name = "pyenergy",
-    version = "0.1rc5",
+    version = "0.1rc6",
     author = "James Pallister",
     author_email = "james.pallister@bristol.ac.uk",
     description = ("An interface to the MAGEEC energy monitor boards"),
