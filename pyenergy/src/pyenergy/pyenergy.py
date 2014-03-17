@@ -74,7 +74,11 @@ class EnergyMonitor(object):
 
         sdevs = []
         for d in devs:
-            d.set_configuration()
+            try:
+                d.set_configuration()
+            except usb.core.USBError, e:
+                warning("Could not access one of the boards")
+                warning(str(e))
             v = self.getVersion(d)
             if v < EnergyMonitor.baseVersion:
                 warning("Device attached with old firmware, cannot check if this is desired device")
