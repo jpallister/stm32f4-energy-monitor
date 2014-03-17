@@ -255,6 +255,8 @@ def setup():
                 ser = get_input("Serial of energy monitor connected to {}: ".format(platform), initial=default_ser)
             mp  = choice("Measurement point connected to {}".format(platform), ["1", "2", "3" ], initial=default_mp)
             res = choice("Shunt resistor used: ", ["0.05", "0.5", "1", "5"], initial = default_res)
+
+            pin = ""
             while pin == "":
                 pin = get_input("Set the trigger pin: ", initial=default_pin)
 
