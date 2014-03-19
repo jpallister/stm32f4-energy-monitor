@@ -326,7 +326,7 @@ def mspexp430f5529(fname, doMeasure=True):
 def mspexp430fr5739(fname, doMeasure=True):
     em = setupMeasurement("msp-exp430fr5739", doMeasure)
 
-    foreground_proc("{} rf2500 -q \"prog {}\" &".format(tool_config['tools']['mspdebug'], fname))
+    foreground_proc("{} rf2500 \"prog {}\" &".format(tool_config['tools']['mspdebug'], fname), expected_returncode=None)
 
     return finishMeasurement("msp-exp430fr5739", em, doMeasure)
 
