@@ -14,6 +14,7 @@ Options:
     -r --repeat N       Repeat the test N times [default: 1]
     -v --verbose        Be verbose
     --no-measure        Don't measure anything
+    --csv               Print as csv
 
     PLATFORM        Specify the platform on which to run.
                     Available platforms are:
@@ -413,11 +414,14 @@ def main():
         quit(1)
 
     if arguments['--no-measure'] is False:
-        print "Energy:          {}J".format(prettyPrint(m.energy))
-        print "Time:            {}s".format(prettyPrint(m.time))
-        print "Power:           {}W".format(prettyPrint(m.avg_power))
-        print "Average current: {}A".format(prettyPrint(m.avg_current))
-        print "Average voltage: {}V".format(prettyPrint(m.avg_voltage))
+        if arguments['--csv']:
+            print "{m.energy}, {m.time}, {m.avg_power}, {m.avg_current}, {m.avg_voltage}".format(m=m)
+        else:
+            print "Energy:          {}J".format(prettyPrint(m.energy))
+            print "Time:            {}s".format(prettyPrint(m.time))
+            print "Power:           {}W".format(prettyPrint(m.avg_power))
+            print "Average current: {}A".format(prettyPrint(m.avg_current))
+            print "Average voltage: {}V".format(prettyPrint(m.avg_voltage))
 
 if __name__ == "__main__":
     main()
