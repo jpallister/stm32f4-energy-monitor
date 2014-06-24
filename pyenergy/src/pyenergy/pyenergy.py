@@ -308,11 +308,11 @@ class EnergyMonitor(object):
             number of runs if we are waiting for a trigger.
         """
 
-        runs = self.getNumberOfRuns()
+        runs = self.getNumberOfRuns(m_point)
         if runs > 1:
             warning("More than one measurement has completed (expected one)")
         if not self.isRunning(m_point) and runs > 0:
-            self.clearNumberOfRuns()
+            self.clearNumberOfRuns(m_point)
             return True
         return False
 

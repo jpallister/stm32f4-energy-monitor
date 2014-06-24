@@ -75,9 +75,11 @@ def read(serial, pin, mpoints):
     for mp in mpoints:
         em.enableMeasurementPoint(mp)
         em.setTrigger(pin, mp)
+        em.clearNumberOfRuns(mp)
 
-    while not em.measurementCompleted():
-        sleep(0.1)
+    for mp in mpoints:
+        while not em.measurementCompleted():
+            sleep(0.1)
 
     for mp in mpoints:
         m = em.getMeasurement(mp)
