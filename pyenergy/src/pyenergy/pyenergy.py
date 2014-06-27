@@ -272,6 +272,7 @@ class EnergyMonitor(object):
         """Check whether a particular measurement point is running."""
         debug("Check if running")
         b = self.dev.ctrl_transfer(0xc1, 8, int(m_point), 0, 4)
+        debug("Received bytes: {0}".format(b))
 
         running = unpack("=L", b)
         debug("Running: {0}".format(running))
@@ -294,7 +295,7 @@ class EnergyMonitor(object):
 
         runs = unpack("=L", b)
         debug("Runs: {0}".format(runs[0]))
-        return bool(runs[0])
+        return int(runs[0])
 
     # Reset the number of runs counts to 0
     def clearNumberOfRuns(self, m_point=1):
@@ -308,11 +309,11 @@ class EnergyMonitor(object):
             number of runs if we are waiting for a trigger.
         """
 
-        runs = self.getNumberOfRuns()
+        runs = self.getNumberOfRuns(m_point)
         if runs > 1:
             warning("More than one measurement has completed (expected one)")
         if not self.isRunning(m_point) and runs > 0:
-            self.clearNumberOfRuns()
+            self.clearNumberOfRuns(m_point)
             return True
         return False
 
