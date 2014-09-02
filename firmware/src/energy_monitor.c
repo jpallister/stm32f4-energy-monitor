@@ -43,13 +43,6 @@ static const struct usb_endpoint_descriptor data_endp[] = {{
 }, {
     .bLength = USB_DT_ENDPOINT_SIZE,
     .bDescriptorType = USB_DT_ENDPOINT,
-    .bEndpointAddress = 0x01,
-    .bmAttributes = USB_ENDPOINT_ATTR_BULK,
-    .wMaxPacketSize = 64,
-    .bInterval = 1,
-}, {
-    .bLength = USB_DT_ENDPOINT_SIZE,
-    .bDescriptorType = USB_DT_ENDPOINT,
     .bEndpointAddress = 0x82,
     .bmAttributes = USB_ENDPOINT_ATTR_INTERRUPT,
     .wMaxPacketSize = 64,
@@ -61,7 +54,7 @@ static const struct usb_interface_descriptor data_iface[] = {{
     .bDescriptorType = USB_DT_INTERFACE,
     .bInterfaceNumber = 0,
     .bAlternateSetting = 0,
-    .bNumEndpoints = 3,
+    .bNumEndpoints = 2,
     .bInterfaceClass = 0xFF,
     .bInterfaceSubClass = 0,
     .bInterfaceProtocol = 0,
@@ -96,7 +89,6 @@ static const char *usb_strings[] = {
     0x08004000,
 };
 
-void dma_setup();
 void adc_setup();
 void error_condition();
 
@@ -136,7 +128,6 @@ typedef struct {
     int number_of_runs;
 
     // Implement a circular buffer in data_bufs
-    int head_ptr, tail_ptr;
     int trigger_port, trigger_pin;
 
     int assigned_adc;
@@ -155,9 +146,6 @@ int adc_to_mpoint[3] = {-1, -1, -1};
 
 // USB communication globals ////////////////////////////////////////
 usbd_device *usbd_dev;
-
-int send_int = 0;
-char interrupt_buf[4]= {0};
 
 uint8_t control_buffer[128] __attribute__((aligned (16)));
 
@@ -215,8 +203,6 @@ void exti_setup(int m_point)
 void start_measurement(int m_point)
 {
     m_points[m_point].running = 1;
-    m_points[m_point].head_ptr = 0;
-    m_points[m_point].tail_ptr = 0;
 
     m_points[m_point].accum_data.energy_accum = 0;
     m_points[m_point].accum_data.elapsed_time = 0;
@@ -425,36 +411,6 @@ static int usbdev_control_request(usbd_device *usbd_dev, struct usb_setup_data *
     return 1;
 }
 
-static void usbdev_data_rx_cb(usbd_device *usbd_dev, uint8_t ep)
-{
-    (void)ep;
-
-    char buf[64];
-    int len = usbd_ep_read_packet(usbd_dev, 0x01, buf, 64);
-    int i;
-
-    for(i = 0; i < len; ++i)
-    {
-        // if(buf[i] == 'S')
-        // {
-        //     running = 1;
-        //     head_ptr = 0;
-        //     tail_ptr = 0;
-        //     timer_enable_counter(TIM2);
-        //     adc_power_on(ADC1);
-        // }
-        // if(buf[i] == 'F')
-        // {
-        //     running = 0;
-        //     timer_disable_counter(TIM2);
-        //     adc_off(ADC1);
-        // }
-    }
-
-    gpio_toggle(GPIOD, GPIO15);
-}
-
-
 static void usb_reset_cb()
 {
     int i;
@@ -465,8 +421,6 @@ static void usb_reset_cb()
         m_points[i].trigger_port = -1;
         m_points[i].trigger_pin = -1;
         m_points[i].assigned_adc = -1;
-        m_points[i].head_ptr = 0;
-        m_points[i].tail_ptr = 0;
     }
 }
 
@@ -474,7 +428,7 @@ static void usbdev_set_config(usbd_device *usbd_dev, uint16_t wValue)
 {
     (void)wValue;
 
-    usbd_ep_setup(usbd_dev, 0x01, USB_ENDPOINT_ATTR_BULK, 64, usbdev_data_rx_cb);
+    // usbd_ep_setup(usbd_dev, 0x01, USB_ENDPOINT_ATTR_BULK, 64, usbdev_data_rx_cb);
     usbd_ep_setup(usbd_dev, 0x81, USB_ENDPOINT_ATTR_BULK, 64, NULL);
     usbd_ep_setup(usbd_dev, 0x82, USB_ENDPOINT_ATTR_INTERRUPT, 64, NULL);
 
@@ -575,7 +529,7 @@ void adc_setup()
 
 void exti_timer_setup()
 {
-    // Timer is used for deboucing
+    // Timer is used for deboucing (is it?)
     // If output on trigger is the same 3ms later, accept as input
     rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_TIM3EN);
     timer_reset(TIM3);
@@ -598,51 +552,12 @@ void exti_timer_setup()
     nvic_set_priority(NVIC_EXTI15_10_IRQ, 0x40);
 }
 
+// This should probably reset the board and tell the user
 void error_condition()
 {
     gpio_set(GPIOD, GPIO15);
     while(1);
 }
-
-// void process_buffer(power_data *pd, accumulated_data *a_data)
-// {
-//     int i;
-//     unsigned pp_tot = 0, pv_tot = 0, pi_tot=0;
-
-//     // Subtract 1 incase we have an unpaired sample at the end
-//     unsigned short n_samples = pd->idx - 1;
-
-//     for(i = 0; i < n_samples; i+=2)
-//     {
-//         unsigned short c = pd->data[i+1];
-//         unsigned short v = pd->data[i];
-//         unsigned p = c*v;
-
-//         a_data->energy_accum += p;
-//         pp_tot += p;
-//         pi_tot += c;
-//         pv_tot += v;
-
-//         a_data->n_samples += 1;
-//         a_data->elapsed_time += tperiod;
-//         a_data->avg_voltage += v;
-//         a_data->avg_current += c;
-//     }
-
-//     pp_tot /= n_samples/2;
-//     pv_tot /= n_samples/2;
-//     pi_tot /= n_samples/2;
-
-//     if(pp_tot > a_data->peak_power)
-//         a_data->peak_power = pp_tot;
-//     if(pv_tot > a_data->peak_voltage)
-//         a_data->peak_voltage = pv_tot;
-//     if(pi_tot > a_data->peak_current)
-//         a_data->peak_current = pi_tot;
-
-// }
-
-int cnt=0;
 
 int main(void)
 {
@@ -659,6 +574,7 @@ int main(void)
     rcc_peripheral_enable_clock(&RCC_AHB2ENR, RCC_AHB2ENR_OTGFSEN);
 
     // First want to check our serial. If not set, set it
+    // Probably want to check that these are alphanumeric as well
     if(serial_str[0] == 0xFF && serial_str[1] == 0xFF && serial_str[2] == 0xFF && serial_str[3] == 0xFF)
     {
         flash_serial('E', 'E', '0', '0');
@@ -694,8 +610,6 @@ int main(void)
     m_points[3].chans[0] = 8;
     m_points[3].chans[1] = 14;
 
-
-    // dma_setup();
     adc_setup();
     timer_setup();
     exti_timer_setup();
@@ -706,7 +620,6 @@ int main(void)
     usbd_dev = usbd_init(&otgfs_usb_driver, &dev, &config, usb_strings, 3, control_buffer, 128);
     usbd_register_set_config_callback(usbd_dev, usbdev_set_config);
 
-    offset = 0;
     while (1)
     {
         usbd_poll(usbd_dev);
