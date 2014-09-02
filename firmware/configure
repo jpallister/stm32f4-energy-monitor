@@ -2878,10 +2878,17 @@ if test x$host_alias != xarm-none-eabi; then
     as_fn_error $? "Please rerun with --host=arm-none-eabi" "$LINENO" 5
 fi
 
-# gcc-arm-embedded requires these libraries for the tests, else they'll fail
-LDFLAGS="-lc -lnosys $LDFLAGS"
+libopencm3_location=`readlink -m $srcdir`/libopencm3
 
-CFLAGS="-mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 $CFLAGS"
+if ! test -d $libopencm3_location; then
+    echo -e "Please run (in the source directory)\n\tcd firmware\n\tgit clone https://github.com/libopencm3/libopencm3\n\tcd libopencm3\n\tgit checkout 806ebb18faf3285bb4dfa3c9c2caeac77dca7f34\n\tmake"
+    exit 1;
+fi
+
+# gcc-arm-embedded requires these libraries for the tests, else they'll fail
+LDFLAGS="-lc -lnosys -L$libopencm3_location/lib $LDFLAGS"
+
+CFLAGS="-mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -I$libopencm3_location/include $CFLAGS"
 
 
 case `pwd` in

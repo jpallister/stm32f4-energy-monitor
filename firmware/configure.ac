@@ -16,9 +16,16 @@ if test x$host_alias != xarm-none-eabi; then
     AC_MSG_ERROR([Please rerun with --host=arm-none-eabi])
 fi
 
+libopencm3_location=`readlink -m $srcdir`/libopencm3
+
+if ! test -d $libopencm3_location; then
+    echo -e "Please run (in the source directory)\n\tcd firmware\n\tgit clone https://github.com/libopencm3/libopencm3\n\tcd libopencm3\n\tgit checkout 806ebb18faf3285bb4dfa3c9c2caeac77dca7f34\n\tmake"
+    exit 1;
+fi
+
 # gcc-arm-embedded requires these libraries for the tests, else they'll fail
-AC_SUBST([LDFLAGS], ["-lc -lnosys $LDFLAGS"])
-AC_SUBST([CFLAGS], ["-mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 $CFLAGS"])
+AC_SUBST([LDFLAGS], ["-lc -lnosys -L$libopencm3_location/lib $LDFLAGS"])
+AC_SUBST([CFLAGS], ["-mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -I$libopencm3_location/include $CFLAGS"])
 
 AC_PROG_LIBTOOL
 LT_INIT

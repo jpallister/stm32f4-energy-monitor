@@ -1,15 +1,15 @@
 #include <stdlib.h>
-#include <libopencm3/stm32/f4/rcc.h>
-#include <libopencm3/stm32/f4/gpio.h>
-#include <libopencm3/stm32/f4/adc.h>
+#include <libopencm3/stm32/rcc.h>
+#include <libopencm3/stm32/gpio.h>
+#include <libopencm3/stm32/adc.h>
 #include <libopencm3/stm32/timer.h>
 #include <libopencm3/usb/usbd.h>
 #include <libopencm3/usb/cdc.h>
 #include <libopencm3/cm3/scb.h>
 #include <libopencm3/cm3/nvic.h>
 #include <libopencm3/cm3/systick.h>
-#include <libopencm3/stm32/f4/dma.h>
-#include <libopencm3/stm32/f4/flash.h>
+#include <libopencm3/stm32/dma.h>
+#include <libopencm3/stm32/flash.h>
 #include <libopencm3/stm32/exti.h>
 #include <libopencm3/stm32/pwr.h>
 
@@ -666,7 +666,7 @@ int main(void)
 
     // 1ms tick
     systick_set_reload(168000);
-    systick_set_clocksource(STK_CTRL_CLKSOURCE_AHB);
+    systick_set_clocksource(STK_CSR_CLKSOURCE);
     systick_counter_enable();
     nvic_set_priority(NVIC_SYSTICK_IRQ, 0xFF);
     systick_interrupt_enable();
