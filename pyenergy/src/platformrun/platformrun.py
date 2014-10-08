@@ -149,9 +149,9 @@ def kill_background_proc(p):
     bg_procs.remove(p)
 
 def killBgOnCtrlC(f):
-    def wrap(platform, measurement):
+    def wrap(platform, *args, **kwargs):
         try:
-            return f(platform, measurement)
+            return f(platform, *args, **kwargs)
         except:
             info("Keyboard interrupt, killing background procs")
             for p in copy.copy(bg_procs):
