@@ -22,6 +22,7 @@ default_config = {
     'tools': {
         'arm_gdb' : 'arm-none-eabi-gdb',
         'stutil' : 'st-util',
+        'openocd' : 'openocd',
         'avr_objcopy' : "avr-objcopy",
         'avrdude' : "avrdude",
         'pic32_objcopy' : 'pic32-objcopy',
@@ -32,6 +33,7 @@ default_config = {
     'platforms': {
         'stm32f0discovery': ['arm_gdb', 'stutil'],
         'stm32vldiscovery': ['arm_gdb', 'stutil'],
+        'beaglebone': ['arm_gdb', 'openocd'],
         'atmega328p': ['avr_objcopy', 'avrdude'],
         'xmegaa3buxplained': ['avr_objcopy', 'avrdude'],
         'pic32mx250f128b': ['pic32_objcopy', 'pic32prog'],

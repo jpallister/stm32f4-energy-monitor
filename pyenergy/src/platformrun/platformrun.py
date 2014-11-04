@@ -149,9 +149,9 @@ def kill_background_proc(p):
     bg_procs.remove(p)
 
 def killBgOnCtrlC(f):
-    def wrap(platform, measurement):
+    def wrap(platform, *args, **kwargs):
         try:
-            return f(platform, measurement)
+            return f(platform, *args, **kwargs)
         except:
             info("Keyboard interrupt, killing background procs")
             for p in copy.copy(bg_procs):
@@ -201,15 +201,19 @@ def setupMeasurement(platform, doMeasure=True):
 
     return em
 
-def finishMeasurement(platform, em, doMeasure=True):
+def finishMeasurement(platform, em, doMeasure=True, timeout=30):
     if not doMeasure:
         return None
 
     mp = int(measurement_config[platform]['measurement-point'])
 
     info("Waiting for measurement to complete")
+    t = 0
     while not em.measurementCompleted(mp):
         sleep(0.1)
+        t += 1
+        if t > timeout * 10:
+            raise CommandError("Measurement timeout")
     info("Measurement complete")
     m = em.getMeasurement(mp)
 
@@ -263,6 +267,16 @@ def stm32vldiscovery(fname, doMeasure=True):
 
     return finishMeasurement("stm32vldiscovery", em, doMeasure)
 
+@killBgOnCtrlC
+def beaglebone(fname, doMeasure=True):
+    em = setupMeasurement("beaglebone", doMeasure)
+
+    openocdproc = background_proc(tool_config['tools']['openocd'] + " -f board/ti_beaglebone.cfg")
+    gdb_launch(tool_config['tools']['arm_gdb'], 3333, fname)
+    kill_background_proc(openocdproc)
+
+    return finishMeasurement("beaglebone", em, doMeasure)
+
 
 def atmega328p(fname, doMeasure=True):
     em = setupMeasurement("atmega328p", doMeasure)
@@ -281,7 +295,8 @@ def atmega328p(fname, doMeasure=True):
         silence = "-q -q"
 
     ser_id = measurement_config['atmega328p']['serial-dev-id']
-    cmdline = "{} -F -V -c arduino -p atmega328p -e -P `readlink -m /dev/serial/by-id/{}` -b 115200 -U flash:w:{}".format(tool_config['tools']['avrdude'], ser_id, tf.name)
+    ttyusb = pexpect.run("readlink -m /dev/serial/by-id/{}".format(ser_id))
+    cmdline = "{} -F -V -c arduino -p atmega328p -e -P {} -b 115200 -U flash:w:{}".format(tool_config['tools']['avrdude'], ttyusb, tf.name)
     foreground_proc(cmdline)
 
     try:
@@ -366,6 +381,8 @@ def run(platformname, execname, measurement=True):
         m = stm32f0discovery(execname, measurement)
     elif platformname == "stm32vldiscovery":
         m = stm32vldiscovery(execname, measurement)
+    elif platformname == "beaglebone":
+        m = beaglebone(execname, measurement)
     elif platformname == "atmega328p":
         m = atmega328p(execname, measurement)
     elif platformname == "xmegaa3buxplained":
