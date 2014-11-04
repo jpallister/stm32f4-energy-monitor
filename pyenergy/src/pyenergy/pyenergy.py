@@ -199,14 +199,13 @@ class EnergyMonitor(object):
     def getBoards():
         """Return a list of all energy monitor boards connected to the host"""
 
-        devs = usb.core.find(idVendor=0xf539, idProduct=0xf539, find_all = True)
+        devs = list(usb.core.find(idVendor=0xf539, idProduct=0xf539, find_all = True))
         return devs
 
     # Connect to the device
     def connect(self):
         """Connect to the specified board, and check firmware version"""
         info("Connecting to energy monitor")
-        self.dev.set_configuration()
         self.version = self.getVersion(self)
 
         if self.version < EnergyMonitor.baseVersion:
