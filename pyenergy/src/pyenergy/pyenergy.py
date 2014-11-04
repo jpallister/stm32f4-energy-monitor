@@ -148,7 +148,7 @@ class EnergyMonitor(object):
     # The boards did not use to have a version associated with them, the first
     # version is version 10 (thus if we have an error getting the version we
     # assume the board is older than version 10).
-    newestVersion = 10
+    newestVersion = 13
     baseVersion = 10
 
     def __init__(self, serial="EE00"):
@@ -208,7 +208,7 @@ class EnergyMonitor(object):
         info("Connecting to energy monitor")
         self.version = self.getVersion(self)
 
-        if self.version < EnergyMonitor.baseVersion:
+        if self.version < EnergyMonitor.baseVersion or self.version < 13:
             error("Firmware is too old, please update")
         if self.version < EnergyMonitor.newestVersion:
             warning("More recent firmware is available, please update")
@@ -227,7 +227,7 @@ class EnergyMonitor(object):
             pass
 
         try:
-            b = dev.ctrl_transfer(0xc1, 12, 0, 0, 4)
+            b = dev.ctrl_transfer(0xc3, 12, 0, 0, 4)
         except usb.core.USBError as e:
             if e.errno == 32:
                 return 0
@@ -244,33 +244,33 @@ class EnergyMonitor(object):
         except:
             pass
 
-        b = dev.ctrl_transfer(0xc1, 13, 0, 0, 4)
+        b = dev.ctrl_transfer(0xc3, 13, 0, 0, 4)
         serial = unpack("=4s", b)[0]
         return serial
 
     # Toggle the LEDs on the device
     def toggleLEDs(self):
         """Toggle some of the LEDs on the board."""
-        self.dev.ctrl_transfer(0x41, 0, 0, 0, None)
+        self.dev.ctrl_transfer(0x43, 0, 0, 0, None)
 
     # Start measuring on m_point
     def start(self, m_point=1):
         """Clear the number of runs and start measurement on the specified
         measurement point."""
         self.clearNumberOfRuns()
-        self.dev.ctrl_transfer(0x41, 1, int(m_point), 0, None)
+        self.dev.ctrl_transfer(0x43, 1, int(m_point), 0, None)
 
     # Stop measuring on m_point
     def stop(self, m_point=1):
         """Stop the measurement on the specified measurement point."""
-        self.dev.ctrl_transfer(0x41, 2, int(m_point), 0, None)
+        self.dev.ctrl_transfer(0x43, 2, int(m_point), 0, None)
 
     # Return whether the measurement point is currently taking
     # measurements or not
     def isRunning(self, m_point=1):
         """Check whether a particular measurement point is running."""
         debug("Check if running")
-        b = self.dev.ctrl_transfer(0xc1, 8, int(m_point), 0, 4)
+        b = self.dev.ctrl_transfer(0xc3, 8, int(m_point), 0, 4)
         debug("Received bytes: {0}".format(b))
 
         running = unpack("=L", b)
@@ -290,7 +290,7 @@ class EnergyMonitor(object):
         """
 
         debug("Get number of runs")
-        b = self.dev.ctrl_transfer(0xc1, 9, int(m_point), 0, 4)
+        b = self.dev.ctrl_transfer(0xc3, 9, int(m_point), 0, 4)
 
         runs = unpack("=L", b)
         debug("Runs: {0}".format(runs[0]))
@@ -299,7 +299,7 @@ class EnergyMonitor(object):
     # Reset the number of runs counts to 0
     def clearNumberOfRuns(self, m_point=1):
         """Clear the counter used to store the number of runs."""
-        self.dev.ctrl_transfer(0x41, 10, int(m_point), 0, None)
+        self.dev.ctrl_transfer(0x43, 10, int(m_point), 0, None)
 
     # Have we completed a measurement?
     def measurementCompleted(self, m_point = 1):
@@ -323,7 +323,7 @@ class EnergyMonitor(object):
         if len(ser) != 4:
             warning("Serial should be 4 characters.")
             ser = (ser + "0000")[:4]
-        self.dev.ctrl_transfer(0x41, 3, ord(ser[0]) | (ord(ser[1])<<8), ord(ser[2]) | (ord(ser[3])<<8), None)
+        self.dev.ctrl_transfer(0x43, 3, ord(ser[0]) | (ord(ser[1])<<8), ord(ser[2]) | (ord(ser[3])<<8), None)
 
     # Set a particular port as a pin trigger for a measurement point
     #   e.g PA0
@@ -342,7 +342,7 @@ class EnergyMonitor(object):
 
         # TODO check port is of the form PA0
         info("Set trigger on {}".format(port))
-        self.dev.ctrl_transfer(0x41, 4, ord(port[1]) | (m_point<<8), int(port[2]), None)
+        self.dev.ctrl_transfer(0x43, 4, ord(port[1]) | (m_point<<8), int(port[2]), None)
 
     # Enable a particular measurement point. There are
     # only 3 ADCs in the device, so only 3 measurement points
@@ -378,7 +378,7 @@ class EnergyMonitor(object):
             raise RuntimeError("Measurement point {} cannot be used with ADC3 (the only free ADC)".format(m_point))
         info("Measurement point {} mapped to ADC {}".format(m_point, adc))
         self.adcMpoint[adc] = m_point
-        self.dev.ctrl_transfer(0x41, 7, int(m_point), adc, None)
+        self.dev.ctrl_transfer(0x43, 7, int(m_point), adc, None)
 
     # Disable a particular measurement point, so that the
     # ADC could potentially be used with a different one
@@ -430,7 +430,7 @@ class EnergyMonitor(object):
         """
 
         info("getMeasurement")
-        b = self.dev.ctrl_transfer(0xc1, 6, int(m_point), 0, calcsize(EnergyMonitor.MeasurementData_packing))
+        b = self.dev.ctrl_transfer(0xc3, 6, int(m_point), 0, calcsize(EnergyMonitor.MeasurementData_packing))
         u = EnergyMonitor.MeasurementData._make(unpack(EnergyMonitor.MeasurementData_packing, b))
 
         info(u)
@@ -444,7 +444,7 @@ class EnergyMonitor(object):
             current and voltage, as well as an average of the current and
             voltage over the last 32 samples.
         """
-        b = self.dev.ctrl_transfer(0xc1, 11, int(m_point), 0, calcsize(EnergyMonitor.InstantaneousData_packing))
+        b = self.dev.ctrl_transfer(0xc3, 11, int(m_point), 0, calcsize(EnergyMonitor.InstantaneousData_packing))
         args = list(unpack(EnergyMonitor.InstantaneousData_packing, b))
         args.append(m_point)
         return args
