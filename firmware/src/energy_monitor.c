@@ -149,7 +149,7 @@ usbd_device *usbd_dev;
 
 uint8_t control_buffer[128] __attribute__((aligned (16)));
 
-unsigned versionNumber=10;
+unsigned versionNumber=13;
 
 /////////////////////////////////////////////////////////////////////
 
@@ -434,7 +434,7 @@ static void usbdev_set_config(usbd_device *usbd_dev, uint16_t wValue)
 
     usbd_register_control_callback(
                 usbd_dev,
-                USB_REQ_TYPE_VENDOR | USB_REQ_TYPE_INTERFACE,
+                USB_REQ_TYPE_VENDOR | 3,
                 USB_REQ_TYPE_TYPE | USB_REQ_TYPE_RECIPIENT,
                 usbdev_control_request);
 
@@ -575,7 +575,7 @@ int main(void)
 
     // First want to check our serial. If not set, set it
     // Probably want to check that these are alphanumeric as well
-    if(serial_str[0] == 0xFF && serial_str[1] == 0xFF && serial_str[2] == 0xFF && serial_str[3] == 0xFF)
+    if(!isalnum(serial_str[0]) || !isalnum(serial_str[1]) || !isalnum(serial_str[2]) || !isalnum(serial_str[3]))
     {
         flash_serial('E', 'E', '0', '0');
     }
