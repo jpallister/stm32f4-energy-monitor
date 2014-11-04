@@ -263,6 +263,16 @@ def stm32vldiscovery(fname, doMeasure=True):
 
     return finishMeasurement("stm32vldiscovery", em, doMeasure)
 
+@killBgOnCtrlC
+def beaglebone(fname, doMeasure=True):
+    em = setupMeasurement("beaglebone", doMeasure)
+
+    openocdproc = background_proc(tool_config['tools']['openocd'] + " -f board/ti_beaglebone.cfg")
+    gdb_launch(tool_config['tools']['arm_gdb'], 3333, fname)
+    kill_background_proc(openocdproc)
+
+    return finishMeasurement("beaglebone", em, doMeasure)
+
 
 def atmega328p(fname, doMeasure=True):
     em = setupMeasurement("atmega328p", doMeasure)
@@ -366,6 +376,8 @@ def run(platformname, execname, measurement=True):
         m = stm32f0discovery(execname, measurement)
     elif platformname == "stm32vldiscovery":
         m = stm32vldiscovery(execname, measurement)
+    elif platformname == "beaglebone":
+        m = beaglebone(execname, measurement)
     elif platformname == "atmega328p":
         m = atmega328p(execname, measurement)
     elif platformname == "xmegaa3buxplained":
