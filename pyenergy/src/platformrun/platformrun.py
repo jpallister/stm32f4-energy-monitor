@@ -159,7 +159,7 @@ def killBgOnCtrlC(f):
     def wrap(platform, *args, **kwargs):
         try:
             return f(platform, *args, **kwargs)
-        except:
+        except KeyboardInterrupt:
             info("Keyboard interrupt, killing background procs")
             for p in copy.copy(bg_procs):
                 kill_background_proc(p)
