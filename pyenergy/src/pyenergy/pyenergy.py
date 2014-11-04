@@ -407,14 +407,17 @@ class EnergyMonitor(object):
             Convert the data from the raw form returned, and into standard
             units.
         """
-        en = float(vref)**2 / gain / resistor / 4096**2 * 2 * samplePeriod * 2 / 168000000. * md.energy_accum * 2
-        el = md.elapsed_time * 2. / 168000000 * 2
-        pp = float(vref)**2 / gain / resistor / 4096**2 * md.peak_power * 2
-        pv = float(vref) / 4096. * md.peak_voltage * 2
-        pi = float(vref) / gain / resistor / 4096. * md.peak_current
-        av = float(vref) / 4096. * md.avg_voltage / md.n_samples * 2
-        ai = float(vref) / gain / resistor / 4096. * md.avg_current / md.n_samples
-        ap = en/el
+        try:
+            en = float(vref)**2 / gain / resistor / 4096**2 * 2 * samplePeriod * 2 / 168000000. * md.energy_accum * 2
+            el = md.elapsed_time * 2. / 168000000 * 2
+            pp = float(vref)**2 / gain / resistor / 4096**2 * md.peak_power * 2
+            pv = float(vref) / 4096. * md.peak_voltage * 2
+            pi = float(vref) / gain / resistor / 4096. * md.peak_current
+            av = float(vref) / 4096. * md.avg_voltage / md.n_samples * 2
+            ai = float(vref) / gain / resistor / 4096. * md.avg_current / md.n_samples
+            ap = en/el
+        except ZeroDivisionError:
+            en, el, pp, pv, pi, av, ai, ap = 0, 0, 0, 0, 0, 0, 0, 0
 
         m = Measurement(en, el, pp, pv, pi, md.n_samples, av, ai, ap)
 

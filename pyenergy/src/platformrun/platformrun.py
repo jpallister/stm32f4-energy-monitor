@@ -60,9 +60,16 @@ class LogWriter(object):
     def __init__(self, logger, level):
         self.logger = logger
         self.level = level
+        self.current_msg = ""
     def write(self, msg):
-        for s in msg.split('\n'):
-            self.logger.log(self.level, s)
+        self.current_msg += msg
+
+        if '\n' in self.current_msg:
+            s = self.current_msg.split('\n')
+            to_print = s[:-1]
+            self.current_msg = s[-1]
+            for s in to_print:
+                self.logger.log(self.level, s)
     def flush(self):
         pass
     def close(self):
@@ -279,8 +286,6 @@ def beaglebone(fname, doMeasure=True):
 
 
 def atmega328p(fname, doMeasure=True):
-    em = setupMeasurement("atmega328p", doMeasure)
-
     # Create temporary file and convert to hex file
     tf = tempfile.NamedTemporaryFile(delete=False)
     tf.close()
@@ -295,8 +300,17 @@ def atmega328p(fname, doMeasure=True):
         silence = "-q -q"
 
     ser_id = measurement_config['atmega328p']['serial-dev-id']
-    ttyusb = pexpect.run("readlink -m /dev/serial/by-id/{}".format(ser_id))
-    cmdline = "{} -F -V -c arduino -p atmega328p -e -P {} -b 115200 -U flash:w:{}".format(tool_config['tools']['avrdude'], ttyusb, tf.name)
+    cmdline = "readlink -m /dev/serial/by-id/{}".format(ser_id)
+    location = pexpect.run(cmdline).strip()
+    info("AVR programmer @ {}".format(location))
+
+    info("Perform erase of the chip")
+    cmdline = "{} -F -c arduino -p atmega328p -e -P {} -b 115200".format(tool_config['tools']['avrdude'], location)
+    foreground_proc(cmdline)
+
+    em = setupMeasurement("atmega328p", doMeasure)
+
+    cmdline = "{} -F -V -c arduino -p atmega328p -P {} -b 115200 -U flash:w:{}".format(tool_config['tools']['avrdude'], location, tf.name)
     foreground_proc(cmdline)
 
     try:
