@@ -15,6 +15,8 @@ Options:
     -v --verbose        Be verbose
     --no-measure        Don't measure anything
     --csv               Print as csv
+    -s                  Split energy measurements when board using multiple
+                        measurement points
 
     PLATFORM        Specify the platform on which to run.
                     Available platforms are:
@@ -198,13 +200,22 @@ def setupMeasurement(platform, doMeasure=True):
         raise RuntimeError("Platform {0} does not have all the tools configured. Please rerun configure with --enable-{0}".format(platform))
 
     em = pyenergy.EnergyMonitor(measurement_config[platform]['energy-monitor'])
-    mp = int(measurement_config[platform]['measurement-point'])
+
+    mp_cfg = measurement_config[platform]['measurement-point']
+    if type(mp_cfg) is int:
+        mpoints = [mp_cfg]
+        resistors = [measurement_config[platform]['resistor']]
+    elif type(mp_cfg) is list:
+        mpoints = mp_cfg
+        resistors = measurement_config[platform]['resistor']
+    # mp = int(measurement_config[platform]['measurement-point'])
 
     em.connect()
-    em.enableMeasurementPoint(mp)
-    em.clearNumberOfRuns(mp)
-    em.measurement_params[mp]['resistor'] = float(measurement_config[platform]['resistor'])
-    em.setTrigger(measurement_config[platform]['trigger-pin'], mp)
+    for mp, resistor in zip(mpoints, resistors):
+        em.enableMeasurementPoint(mp)
+        em.clearNumberOfRuns(mp)
+        em.measurement_params[mp]['resistor'] = float(resistor)
+        em.setTrigger(measurement_config[platform]['trigger-pin'], mp)
 
     return em
 
@@ -212,24 +223,37 @@ def finishMeasurement(platform, em, doMeasure=True, timeout=30):
     if not doMeasure:
         return None
 
-    mp = int(measurement_config[platform]['measurement-point'])
+    mp_cfg = measurement_config[platform]['measurement-point']
+    if type(mp_cfg) is int:
+        mpoints = [mp_cfg]
+        resistors = [measurement_config[platform]['resistor']]
+    elif type(mp_cfg) is list:
+        mpoints = mp_cfg
+        resistors = measurement_config[platform]['resistor']
 
     info("Waiting for measurement to complete")
     t = 0
-    while not em.measurementCompleted(mp):
-        sleep(0.1)
-        t += 1
-        if t > timeout * 10:
-            raise CommandError("Measurement timeout")
+    for mp in mpoints:
+        while not em.measurementCompleted(mp):
+            sleep(0.1)
+            t += 1
+            if t > timeout * 10:
+                raise CommandError("Measurement timeout")
     info("Measurement complete")
-    m = em.getMeasurement(mp)
+
+
+    if type(mp_cfg) is list:
+        measurements = map(em.getMeasurement, mpoints)
+        m = pyenergy.MeasurementSet(measurements)
+    else:
+        m = em.getMeasurement(mp)
 
     em.disconnect()
     return m
 
 # Display units nicer
 def prettyPrint(v):
-    units = ['', 'm', 'u', 'n', 'p']
+    units = [' ', 'm', 'u', 'n', 'p']
 
     for unit in units:
         if v > 1.0:
@@ -448,11 +472,29 @@ def main():
         if arguments['--csv']:
             print "{m.energy}, {m.time}, {m.avg_power}, {m.avg_current}, {m.avg_voltage}".format(m=m)
         else:
-            print "Energy:          {}J".format(prettyPrint(m.energy))
-            print "Time:            {}s".format(prettyPrint(m.time))
-            print "Power:           {}W".format(prettyPrint(m.avg_power))
-            print "Average current: {}A".format(prettyPrint(m.avg_current))
-            print "Average voltage: {}V".format(prettyPrint(m.avg_voltage))
+            if arguments['-s'] and hasattr(m,"measurements"):
+
+                s = "       "
+                for i in range(len(m.measurements)):
+                    s += "           {}".format(i+1)
+                print s
+
+                names = ["Energy", "Time", "Power", "Average current", "Average voltage"]
+                keys = ["energy", "time", "avg_power", "avg_current", "avg_voltage"]
+                units = ["J", "s", "W", "A", "V"]
+
+                for name,key,unit in zip(names, keys, units):
+                    print "{}:{}".format(name, " " *(15-len(name))),
+                    for meas in m.measurements:
+                        print "{}{}".format(prettyPrint(meas.__dict__[key]), unit),
+                    print
+
+            else:
+                print "Energy:          {}J".format(prettyPrint(m.energy))
+                print "Time:            {}s".format(prettyPrint(m.time))
+                print "Power:           {}W".format(prettyPrint(m.avg_power))
+                print "Average current: {}A".format(prettyPrint(m.avg_current))
+                print "Average voltage: {}V".format(prettyPrint(m.avg_voltage))
 
 if __name__ == "__main__":
     main()

@@ -18,6 +18,69 @@ debug = logger.debug
 
 
 # import multiprocessing
+class MeasurementSet(object):
+    def __init__(self, measurements):
+        self.measurements = measurements
+
+        self.energy       = sum(self.measurements).energy
+        self.time         = sum(self.measurements).time / len(self.measurements)
+        self.peak_power   = sum(self.measurements).peak_power  # This is only a rough guide
+        self.peak_voltage = sum(self.measurements).peak_voltage
+        self.peak_current = sum(self.measurements).peak_current
+        self.n_samples    = sum(self.measurements).n_samples
+        self.avg_voltage  = sum(self.measurements).avg_voltage
+        self.avg_current  = sum(self.measurements).avg_current
+        self.avg_power    = sum(self.measurements).avg_power
+
+    def _op_self(self, other, fn):
+        params = ["energy", "time", "peak_power", "peak_voltage", "peak_current",
+                "n_samples", "avg_voltage", "avg_current", "avg_power"]
+
+        newmeasurements = []
+        for m1, m2 in zip(self.measurements, other.measurements):
+            m = fn(m1, m2)
+            newmeasurements.append(m)
+        return MeasurementSet(newmeasurements)
+
+    def _op_const(self, const, fn):
+        params = ["energy", "time", "peak_power", "peak_voltage", "peak_current",
+                "n_samples", "avg_voltage", "avg_current", "avg_power"]
+
+        newmeasurements = []
+        for m1 in self.measurements:
+            m = fn(m1, const)
+            newmeasurements.append(m)
+        return MeasurementSet(newmeasurements)
+
+    def _op(self, other, fn):
+        if isinstance(other, MeasurementSet):
+            assert len(self.measurements) == len(other.measurements)
+            return self._op_self(other, fn)
+        else:
+            return self._op_const(other, fn);
+
+    def __add__(self, other):
+        return self._op(other, operator.add)
+    def __sub__(self, other):
+        return self._op(other, operator.sub)
+    def __mul__(self, other):
+        return self._op(other, operator.mul)
+    def __div__(self, other):
+        return self._op(other, operator.div)
+
+    def __radd__(self, other):
+        return self._op(other, operator.add)
+    def __rsub__(self, other):
+        return self._op(other, operator.sub)
+    def __rmul__(self, other):
+        return self._op(other, operator.mul)
+    def __rdiv__(self, other):
+        return self._op(other, operator.div)
+
+    def __repr__(self):
+        keys = ["energy", "time", "peak_power", "peak_voltage", "peak_current", "n_samples", "avg_voltage", "avg_current", "avg_power"]
+        vals = ", ".join(map(lambda x: "{}={}".format(x,self.__dict__[x]), keys))
+        return "MeasurementSet({} measurements, {})".format(len(self.measurements), vals)
 
 class Measurement(object):
     class_version = 1

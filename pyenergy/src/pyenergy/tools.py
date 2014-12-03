@@ -255,14 +255,25 @@ def setup():
             ser = ""
             while ser == "":
                 ser = get_input("Serial of energy monitor connected to {}: ".format(platform), initial=default_ser)
-            mp  = choice("Measurement point connected to {}".format(platform), ["1", "2", "3" ], initial=default_mp)
-            res = choice("Shunt resistor used: ", ["0.05", "0.5", "1", "5"], initial = default_res)
+
+            if platform == "beaglebone":
+                print "All measurement points needed for beagle bone, autoselecting following config:"
+                print "    Measurement points: 1 (DDR), 2 (MPU), 3 (CORE)"
+                print "    Resistors         : 0.5,     0.05,    0.05"
+                mp = [1,2,3]
+                res = [0.5, 0.05, 0.05]
+            else:
+                mp  = choice("Measurement point connected to {}".format(platform), ["1", "2", "3" ], initial=default_mp)
+                res = choice("Shunt resistor used: ", ["0.05", "0.5", "1", "5"], initial = default_res)
+
+                mp = int(mp)
+                res = float(res)
 
             pin = ""
             while pin == "":
                 pin = get_input("Set the trigger pin: ", initial=default_pin)
 
-            config[platform] = {"energy-monitor": str(ser), "measurement-point": int(mp), "resistor": float(res), "trigger-pin": pin}
+            config[platform] = {"energy-monitor": str(ser), "measurement-point": mp, "resistor": res, "trigger-pin": pin}
 
             if platform == "atmega328p":
                 sdi = get_input("ATMEGA328P requires the id of the serial-USB adapter. This can be\nfound in /dev/serial/by-id/\n ? ")
