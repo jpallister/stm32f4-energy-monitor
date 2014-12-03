@@ -338,13 +338,18 @@ def atmega328p(fname, doMeasure=True):
         silence = "-q -q"
 
     ser_id = measurement_config['atmega328p']['serial-dev-id']
-    cmdline = "readlink -m /dev/serial/by-id/{}".format(ser_id)
+    ser_path = "/dev/serial/by-id/{}".format(ser_id)
+
+    if not os.path.exists(ser_path):
+        raise RuntimeError("Cannot find the serial device: "+ser_path)
+
+    cmdline = "readlink -m " + ser_path
     location = pexpect.run(cmdline).strip()
     info("AVR programmer @ {}".format(location))
 
-    info("Perform erase of the chip")
-    cmdline = "{} -F -c arduino -p atmega328p -e -P {} -b 115200".format(tool_config['tools']['avrdude'], location)
-    foreground_proc(cmdline)
+    # info("Perform erase of the chip")
+    # cmdline = "{} -F -c arduino -p atmega328p -e -P {} -b 115200".format(tool_config['tools']['avrdude'], location)
+    # foreground_proc(cmdline)
 
     em = setupMeasurement("atmega328p", doMeasure)
 
