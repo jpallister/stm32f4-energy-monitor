@@ -142,9 +142,12 @@ def background_proc(cmd):
 
         while not ev.isSet():
             proc.expect([r'.*\n', pexpect.EOF, pexpect.TIMEOUT], timeout=1)
+            sleep(0.1)
 
         info("Killing background proc: \"{}\"".format(cmd))
         proc.kill(15)
+        sleep(0.1)
+        proc.kill(9)
 
     ev = threading.Event()
     t = threading.Thread(target=run_proc, args=(ev,))
@@ -162,8 +165,8 @@ def killBgOnCtrlC(f):
     def wrap(platform, *args, **kwargs):
         try:
             return f(platform, *args, **kwargs)
-        except KeyboardInterrupt:
-            info("Keyboard interrupt, killing background procs")
+        except:
+            info("Exception occured, killing background procs")
             for p in copy.copy(bg_procs):
                 kill_background_proc(p)
             raise

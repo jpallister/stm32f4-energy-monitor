@@ -103,8 +103,6 @@ class Measurement(object):
                 "n_samples", "avg_voltage", "avg_current", "avg_power"]
         m = Measurement()
         for p in params:
-            print p
-            print self.__dict__, other.__dict__
             m.__dict__[p] = fn(self.__dict__[p], other.__dict__[p])
         return m
 
@@ -229,6 +227,10 @@ class EnergyMonitor(object):
                 warning("Device attached with old firmware, cannot check if this is desired device")
                 continue
 
+            if v < 13:
+                if usb.util.get_string(d, 3).encode("utf8","ignore") == serial:
+                    error("You need to update the firmware on this board before you can use it")
+                continue
             s = self.getSerial(d)
 
             if s == serial:
@@ -292,9 +294,12 @@ class EnergyMonitor(object):
         try:
             b = dev.ctrl_transfer(0xc3, 12, 0, 0, 4)
         except usb.core.USBError as e:
-            if e.errno == 32:
-                return 0
-            raise
+            try:
+                b = dev.ctrl_transfer(0xc1, 12, 0, 0, 4)
+            except usb.core.USBError as e:
+                if e.errno == 32:
+                    return 0
+                raise
         version = unpack("=L", b)[0]
         return version
 

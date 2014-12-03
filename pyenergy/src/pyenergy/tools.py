@@ -153,13 +153,18 @@ def list_boards():
             d.set_configuration()
             v = pyenergy.EnergyMonitor.getVersion(d)
 
-            if v < pyenergy.EnergyMonitor.baseVersion:
-                serial = "{} (?)".format(usb.util.get_string(d, 256, 3))
+            if v < pyenergy.EnergyMonitor.baseVersion or v < 13:
+                serial = "{}(?)".format(usb.util.get_string(d, 3).encode("utf8","ignore"))
             else:
                 serial = pyenergy.EnergyMonitor.getSerial(d)
         except usb.core.USBError:
             serial = "Error"
             v = "Error"
+
+        if v < 13:
+            v = "{} (Must update firmware before use!)".format(v)
+        if v < pyenergy.EnergyMonitor.newestVersion:
+            v = "{} (Please update firmware)".format(v)
 
         print "    {: <8} {}".format(serial, v)
 
