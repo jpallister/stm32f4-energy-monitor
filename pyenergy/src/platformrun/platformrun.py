@@ -22,6 +22,7 @@ Options:
                     Available platforms are:
                         stm32f0discovery
                         stm32vldiscovery
+                        stm32f4discovery
                         atmega328p
                         xmegaa3buxplained
                         msp-exp430f5529
@@ -299,6 +300,16 @@ def stm32vldiscovery(fname, doMeasure=True):
     return finishMeasurement("stm32vldiscovery", em, doMeasure)
 
 @killBgOnCtrlC
+def stm32f4discovery(fname, doMeasure=True):
+    em = setupMeasurement("stm32f4discovery", doMeasure)
+
+    stproc = background_proc(tool_config['tools']['stutil'] + " -s 2 -p 2003 -c 0x2ba01477 -v0")
+    gdb_launch(tool_config['tools']['arm_gdb'], 2003, fname)
+    kill_background_proc(stproc)
+
+    return finishMeasurement("stm32f4discovery", em, doMeasure)
+
+@killBgOnCtrlC
 def beaglebone(fname, doMeasure=True):
     em = setupMeasurement("beaglebone", doMeasure)
 
@@ -419,6 +430,8 @@ def run(platformname, execname, measurement=True):
         m = stm32f0discovery(execname, measurement)
     elif platformname == "stm32vldiscovery":
         m = stm32vldiscovery(execname, measurement)
+    elif platformname == "stm32f4discovery":
+        m = stm32f4discovery(execname, measurement)
     elif platformname == "beaglebone":
         m = beaglebone(execname, measurement)
     elif platformname == "atmega328p":
