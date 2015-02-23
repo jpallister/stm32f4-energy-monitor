@@ -21,6 +21,7 @@ Options:
     PLATFORM        Specify the platform on which to run.
                     Available platforms are:
                         stm32f0discovery
+                        stm32l0discovery
                         stm32vldiscovery
                         stm32f4discovery
                         atmega328p
@@ -42,6 +43,7 @@ import json
 import pyenergy
 from time import sleep
 import logging
+import usb
 
 import pexpect, sys, copy
 
@@ -349,6 +351,16 @@ def stm32f4discovery(fname, doMeasure=True):
     return finishMeasurement("stm32f4discovery", em, doMeasure)
 
 @killBgOnCtrlC
+def stm32l0discovery(fname, doMeasure=True):
+    em = setupMeasurement("stm32l0discovery", doMeasure)
+
+    stproc = background_proc(tool_config['tools']['openocd'] + ' -f board/stm32l0discovery.cfg --command "gdb_port 2004"')
+    gdb_launch(tool_config['tools']['arm_gdb'], 2004, fname, post_commands=["monitor shutdown"], pre_commands=["monitor reset init"])
+    kill_background_proc(stproc)
+
+    return finishMeasurement("stm32l0discovery", em, doMeasure)
+
+@killBgOnCtrlC
 def beaglebone(fname, doMeasure=True):
     em = setupMeasurement("beaglebone", doMeasure)
 
@@ -476,6 +488,8 @@ def run(platformname, execname, measurement=True):
         m = stm32vldiscovery(execname, measurement)
     elif platformname == "stm32f4discovery":
         m = stm32f4discovery(execname, measurement)
+    elif platformname == "stm32l0discovery":
+        m = stm32l0discovery(execname, measurement)
     elif platformname == "beaglebone":
         m = beaglebone(execname, measurement)
     elif platformname == "atmega328p":
