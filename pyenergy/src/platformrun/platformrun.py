@@ -532,9 +532,15 @@ def main():
     loadToolConfiguration(arguments['--tools'])
 
     try:
-        m = run(arguments['PLATFORM'],
+        # Execute multiple repeats, if requested
+        ms = []
+        for i in range(int(arguments['--repeat'])):
+            m = run(arguments['PLATFORM'],
                 arguments['EXECUTABLE'],
                 arguments['--no-measure'] is False)
+            ms.append(m)
+
+        m = sum(ms) / len(ms)
     except (IOError, RuntimeError) as e:
         print "Error:",e
         quit(1)
