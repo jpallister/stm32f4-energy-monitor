@@ -6,6 +6,7 @@ from struct import *
 from copy import copy
 from collections import namedtuple
 import operator
+from functools import total_ordering
 
 import logging
 
@@ -18,6 +19,7 @@ debug = logger.debug
 
 
 # import multiprocessing
+@total_ordering
 class MeasurementSet(object):
     def __init__(self, measurements):
         self.measurements = measurements
@@ -82,6 +84,13 @@ class MeasurementSet(object):
         vals = ", ".join(map(lambda x: "{}={}".format(x,self.__dict__[x]), keys))
         return "MeasurementSet({} measurements, {})".format(len(self.measurements), vals)
 
+    def __eq__(self, rhs):
+        return all(map(operator.eq, self.measurements, rhs.measurements))
+
+    def __lt__(self, rhs):
+        return self.measurements < rhs.measurements
+
+@total_ordering
 class Measurement(object):
     class_version = 1
 
@@ -140,6 +149,25 @@ class Measurement(object):
 
     def __repr__(self):
         return "Measurement(" + ", ".join(map("{0[0]}={0[1]}".format, self.__dict__.items())) + ")"
+
+    def __eq__(self, rhs):
+        params = ["energy", "time", "peak_power", "peak_voltage", "peak_current",
+                 "n_samples", "avg_voltage", "avg_current", "avg_power"]
+
+        for p in params:
+            if self.__dict__[p] != rhs.__dict__[p]:
+                return False
+
+        return True
+
+    def __lt__(self, rhs):
+        params = ["energy", "time", "peak_power", "peak_voltage", "peak_current",
+                 "n_samples", "avg_voltage", "avg_current", "avg_power"]
+        s1 = (self.__dict__[p] for p in params)
+        s2 = (rhs.__dict__[p] for p in params)
+
+        return s1 < s2
+
 
     # Future proof for new version
     def __getstate__(self):
