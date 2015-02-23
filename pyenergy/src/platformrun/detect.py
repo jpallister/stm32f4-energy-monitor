@@ -34,6 +34,7 @@ default_config = {
         'stm32f0discovery': ['arm_gdb', 'stutil'],
         'stm32vldiscovery': ['arm_gdb', 'stutil'],
         'stm32f4discovery': ['arm_gdb', 'stutil'],
+        'stm32l0discovery': ['arm_gdb', 'openocd'],
         'beaglebone': ['arm_gdb', 'openocd'],
         'atmega328p': ['avr_objcopy', 'avrdude'],
         'xmegaa3buxplained': ['avr_objcopy', 'avrdude'],

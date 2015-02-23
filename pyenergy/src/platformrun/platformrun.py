@@ -89,7 +89,7 @@ def gdb_launch(gdbname, port, fname, run_timeout=30, post_commands=[], pre_comma
     gdb.sendline("set confirm off")
     gdb.expect(r".*\(gdb\) ")
 
-    gdb.sendline("target extended :{}".format(port))
+    gdb.sendline("target remote :{}".format(port))
     gdb.expect(r'Remote debugging using.*\n')
     gdb.expect(r'.*\n')
     gdb.expect(r".*\(gdb\) ")
@@ -104,8 +104,14 @@ def gdb_launch(gdbname, port, fname, run_timeout=30, post_commands=[], pre_comma
     gdb.expect(r".*\(gdb\) ")
 
     gdb.sendline("load")
-    while gdb.expect([r'Loading section.*\n',r'Start address.*\n']) == 0:
-        pass
+    while True:
+        a = gdb.expect([r'Loading section.*\n',r'Start address.*\n', r"Error finishing flash operation.*\n"])
+        if a == 1:
+            break
+        if a == 2:
+            gdb.expect(r".*\(gdb\) ")
+            gdb.sendline("load")
+
     gdb.expect(r'Transfer rate.*\n')
     gdb.expect(r'\(gdb\) ')
 
@@ -135,14 +141,15 @@ def gdb_launch(gdbname, port, fname, run_timeout=30, post_commands=[], pre_comma
     gdb.sendline("quit")
 
 bg_procs = []
+bg_proc_map = {}
 
-def background_proc(cmd):
+def background_proc(cmd, env=None):
 
     def run_proc(ev):
         info("Starting background proc: \"{}\"".format(cmd))
 
         proclogger = logger.getChild(os.path.split(cmd.split(' ')[0])[-1])
-        proc = pexpect.spawn(cmd, logfile=LogWriter(proclogger, logging.DEBUG))
+        proc = pexpect.spawn(cmd, logfile=LogWriter(proclogger, logging.DEBUG), env=env)
 
         while not ev.isSet():
             proc.expect([r'.*\n', pexpect.EOF, pexpect.TIMEOUT], timeout=1)
@@ -150,19 +157,25 @@ def background_proc(cmd):
 
         info("Killing background proc: \"{}\"".format(cmd))
         proc.kill(15)
-        sleep(0.1)
-        proc.kill(9)
+        sleep(0.2)
+        if proc.isalive():
+            warning("Killing (sig 9) background proc: \"{}\"".format(cmd))
+            proc.kill(9)
 
     ev = threading.Event()
     t = threading.Thread(target=run_proc, args=(ev,))
     t.start()
 
     bg_procs.append(ev)
+    bg_proc_map[ev] = t
 
     return ev
 
 def kill_background_proc(p):
     p.set()
+    info("Waiting for background process to exit " + str(p))
+    bg_proc_map[p].join()
+    sleep(0.1)
     bg_procs.remove(p)
 
 def killBgOnCtrlC(f):
@@ -283,6 +296,25 @@ def loadToolConfiguration(fname="~/.platformrunrc"):
     fname = os.path.expanduser(fname)
     tool_config = json.load(open(fname))
 
+##
+
+def findUSBLocation(devid):
+    info("Discovering USB bus address of {}".format(devid))
+
+    for bus in usb.busses():
+        for dev in bus.devices:
+            try:
+                print
+                if devid.lower() == "{:04x}:{:04x}".format(dev.idVendor, dev.idProduct):
+                    addr = "{:03}:{:03}".format(dev.dev.bus, dev.dev.address)
+                    info("Found {}".format(addr))
+                    return addr
+            except usb.core.USBError:
+                pass
+    warning("Could not find device location for {}. The wrong board may be selected".format(addr))
+    return ""
+
+
 #######################################################################
 
 @killBgOnCtrlC
@@ -321,7 +353,7 @@ def beaglebone(fname, doMeasure=True):
     em = setupMeasurement("beaglebone", doMeasure)
 
     openocdproc = background_proc(tool_config['tools']['openocd'] + " -f board/ti_beaglebone.cfg")
-    gdb_launch(tool_config['tools']['arm_gdb'], 3333, fname)
+    gdb_launch(tool_config['tools']['arm_gdb'], 3333, fname, post_commands=["monitor shutdown"], pre_commands=["monitor reset halt"])
     kill_background_proc(openocdproc)
 
     return finishMeasurement("beaglebone", em, doMeasure)
