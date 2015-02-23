@@ -404,6 +404,7 @@ class Graph(QMainWindow):
         else:
             base_t = 0
 
+        problem = False
         for mp, m in measurements.items():
                 i = {"1": 1, "2":2, "3":3, "Self":4}[mp]
                 res = self.em.measurement_params[i]['resistor']
@@ -416,6 +417,9 @@ class Graph(QMainWindow):
 
                 t = base_t
 
+                if self.data[mp]['xdata'] and t < self.data[mp]['xdata'][-1]:
+                    problem=True
+
                 self.data[mp]['xdata'].append(t)
                 self.data[mp]['idata'].append(c)
                 self.data[mp]['vdata'].append(v)
@@ -425,6 +429,27 @@ class Graph(QMainWindow):
                 self.data[mp]['idata'] = self.data[mp]['idata'][-self.wsize:]
                 self.data[mp]['vdata'] = self.data[mp]['vdata'][-self.wsize:]
                 self.data[mp]['pdata'] = self.data[mp]['pdata'][-self.wsize:]
+
+        if problem:
+            self.data = {
+                "1": {"xdata": [],
+                      "idata": [],
+                      "pdata": [],
+                      "vdata": []},
+                "2": {"xdata": [],
+                      "idata": [],
+                      "pdata": [],
+                      "vdata": []},
+                "3": {"xdata": [],
+                      "idata": [],
+                      "pdata": [],
+                      "vdata": []},
+                "Self": {"xdata": [],
+                      "idata": [],
+                      "pdata": [],
+                      "vdata": []},
+                }
+            
 
         self.state = state
         self.on_draw()
