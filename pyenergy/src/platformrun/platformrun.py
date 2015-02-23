@@ -78,7 +78,7 @@ class LogWriter(object):
     def close(self):
         pass
 
-def gdb_launch(gdbname, port, fname, run_timeout=30, post_commands=[]):
+def gdb_launch(gdbname, port, fname, run_timeout=30, post_commands=[], pre_commands=[]):
     info("Starting+connecting to gdb and loading file")
 
     gdblogger = logger.getChild(os.path.split(gdbname)[-1])
@@ -93,6 +93,10 @@ def gdb_launch(gdbname, port, fname, run_timeout=30, post_commands=[]):
     gdb.expect(r'Remote debugging using.*\n')
     gdb.expect(r'.*\n')
     gdb.expect(r".*\(gdb\) ")
+
+    for cmd in pre_commands:
+        gdb.sendline(cmd)
+        gdb.expect(r'.*\(gdb\) ')
 
     info("load file {}".format(fname))
     gdb.sendline("file {}".format(fname))
