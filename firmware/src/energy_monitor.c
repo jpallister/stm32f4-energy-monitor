@@ -133,6 +133,7 @@ typedef struct {
     int assigned_adc;
 
     unsigned short lastI, lastV;
+    unsigned lastP;
 
     unsigned short avgI[INSTANT_AVG_NUM], avgV[INSTANT_AVG_NUM];
     unsigned short avg_ptr;
@@ -149,7 +150,7 @@ usbd_device *usbd_dev;
 
 uint8_t control_buffer[128] __attribute__((aligned (16)));
 
-unsigned versionNumber=13;
+unsigned versionNumber=14;
 
 /////////////////////////////////////////////////////////////////////
 
@@ -212,6 +213,7 @@ void start_measurement(int m_point)
     m_points[m_point].accum_data.n_samples = 0;
     m_points[m_point].accum_data.avg_voltage = 0;
     m_points[m_point].accum_data.avg_current = 0;
+    m_points[m_point].lastP = 0;
 
     switch(m_points[m_point].assigned_adc)
     {
@@ -721,6 +723,7 @@ void adc_isr()
                 mp->avgV[mp->avg_ptr] = val;
             }
 
+            // Once we have read both current and voltage
             if((mp->idx & 1) == 1)
             {
                 accumulated_data *a_data = &mp->accum_data;
@@ -728,7 +731,12 @@ void adc_isr()
                 unsigned short v = mp->lastV;
                 unsigned p = c*v;
 
-                a_data->energy_accum += p;
+                if(a_data->elapsed_time > 0) // ignore first sample (lastP = 0)
+                {
+                    a_data->energy_accum += (p + mp->lastP) / 2; // Trapezoidal integration;
+                }
+
+                mp->lastP = p;
 
                 a_data->n_samples += 1;
                 a_data->elapsed_time += tperiod;
