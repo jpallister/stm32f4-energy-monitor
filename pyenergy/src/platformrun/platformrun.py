@@ -60,6 +60,18 @@ measurement_config = None
 #######################################################################
 
 
+def killBgOnCtrlC(f):
+    def wrap(instance, platform, *args, **kwargs):
+        try:
+            return f(instance, platform, *args, **kwargs)
+        except:
+            info("Exception occured, killing background procs")
+            for p in copy.copy(instance.bg_procs):
+                instance.kill_background_proc(p)
+            raise
+    return wrap
+
+
 class CommandError(RuntimeError):
     pass
 
@@ -193,17 +205,6 @@ class PlatformRun:
         self.bg_proc_map[p].join()
         sleep(0.1)
         self.bg_procs.remove(p)
-
-    def killBgOnCtrlC(self, f):
-        def wrap(platform, *args, **kwargs):
-            try:
-                return f(platform, *args, **kwargs)
-            except:
-                info("Exception occured, killing background procs")
-                for p in copy.copy(self.bg_procs):
-                    self.kill_background_proc(p)
-                raise
-        return wrap
 
     def foreground_proc(self, cmd, expected_returncode=0):
         info("Starting foreground proc: \"{}\"".format(cmd))
