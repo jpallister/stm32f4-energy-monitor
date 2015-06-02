@@ -158,7 +158,7 @@ class Graph(QMainWindow):
             grid.setAlignment(Qt.AlignCenter)
 
             combo = QComboBox()
-            combo.addItems(["0.05", "0.5", "1", "5"])
+            combo.addItems(["0.05", "0.1", "0.5", "1", "5"])
             if mp == "Self":
                 combo.setCurrentIndex(1)
                 combo.setEnabled(False)
@@ -365,7 +365,7 @@ class Graph(QMainWindow):
         first_on = None
 
         for i, mp in enumerate(sorted(state.keys())):
-            self.em.measurement_params[i+1]['resistor'] = [0.05, 0.5, 1.0, 5.0][state[mp][0]]
+            self.em.measurement_params[i+1]['resistor'] = [0.05, 0.1, 0.5, 1.0, 5.0][state[mp][0]]
             stateChange = False
 
             # Check we need to enable or disable a measurement point
