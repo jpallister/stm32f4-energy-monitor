@@ -229,7 +229,7 @@ class PlatformRun:
                 "Command \"{}\" returned {}".format(cmd, proc.exitstatus))
         info("Foreground proc complete")
 
-    def setupMeasurement(platform, doMeasure=True):
+    def setupMeasurement(self, platform, doMeasure=True):
         if not doMeasure:
             return None
 
@@ -260,7 +260,7 @@ class PlatformRun:
 
         return em
 
-    def finishMeasurement(platform, em, doMeasure=True, timeout=30):
+    def finishMeasurement(self, platform, em, doMeasure=True, timeout=30):
         if not doMeasure:
             return None
 
@@ -292,7 +292,7 @@ class PlatformRun:
         return m
 
     # Display units nicer
-    def prettyPrint(v):
+    def prettyPrint(self, v):
         units = [' ', 'm', 'u', 'n', 'p']
 
         for unit in units:
@@ -303,13 +303,13 @@ class PlatformRun:
 
     #######################################################################
 
-    def loadConfiguration(fname="~/.measurementrc"):
+    def loadConfiguration(self, fname="~/.measurementrc"):
         global measurement_config
 
         fname = os.path.expanduser(fname)
         measurement_config = json.load(open(fname))
 
-    def loadToolConfiguration(fname="~/.platformrunrc"):
+    def loadToolConfiguration(self, fname="~/.platformrunrc"):
         global tool_config
 
         fname = os.path.expanduser(fname)
@@ -317,7 +317,7 @@ class PlatformRun:
 
     ##
 
-    def findUSBLocation(devid):
+    def findUSBLocation(self, devid):
         info("Discovering USB bus address of {}".format(devid))
 
         for bus in usb.busses():
@@ -337,8 +337,20 @@ class PlatformRun:
         return ""
 
     #######################################################################
+
     @killBgOnCtrlC
-    def stm32f0discovery(self, fname, doMeasure=True):
+    def platform_xmosslicekita16(self, fname, doMeasure=True):
+        name = "xmosslicekita16"
+        em = self.setupMeasurement(name, doMeasure)
+
+        xrunproc = self.background_proc(tool_config['tools']['xrun'] +
+                                        " --xscope")
+        self.kill_background_proc(xrunproc)
+
+        return self.finishMeasurement(name, em, doMeasure)
+
+    @killBgOnCtrlC
+    def platform_stm32f0discovery(self, fname, doMeasure=True):
         em = self.setupMeasurement("stm32f0discovery", doMeasure)
 
         stproc = self.background_proc(tool_config['tools']['stutil'] +
@@ -349,7 +361,7 @@ class PlatformRun:
         return self.finishMeasurement("stm32f0discovery", em, doMeasure)
 
     @killBgOnCtrlC
-    def stm32vldiscovery(self, fname, doMeasure=True):
+    def platform_stm32vldiscovery(self, fname, doMeasure=True):
         em = self.setupMeasurement("stm32vldiscovery", doMeasure)
 
         stproc = self.background_proc(tool_config['tools']['stutil'] +
@@ -360,7 +372,7 @@ class PlatformRun:
         return self.finishMeasurement("stm32vldiscovery", em, doMeasure)
 
     @killBgOnCtrlC
-    def stm32f4discovery(self, fname, doMeasure=True):
+    def platform_stm32f4discovery(self, fname, doMeasure=True):
         em = self.setupMeasurement("stm32f4discovery", doMeasure)
 
         stproc = self.background_proc(tool_config['tools']['stutil'] +
@@ -371,7 +383,7 @@ class PlatformRun:
         return self.finishMeasurement("stm32f4discovery", em, doMeasure)
 
     @killBgOnCtrlC
-    def stm32l0discovery(self, fname, doMeasure=True):
+    def platform_stm32l0discovery(self, fname, doMeasure=True):
         em = self.setupMeasurement("stm32l0discovery", doMeasure)
 
         stproc = self.background_proc(tool_config['tools']['openocd'] +
@@ -385,7 +397,7 @@ class PlatformRun:
         return self.finishMeasurement("stm32l0discovery", em, doMeasure)
 
     @killBgOnCtrlC
-    def beaglebone(self, fname, doMeasure=True):
+    def platform_beaglebone(self, fname, doMeasure=True):
         em = self.setupMeasurement("beaglebone", doMeasure)
 
         openocdproc = self.background_proc(tool_config['tools']['openocd'] +
@@ -397,7 +409,7 @@ class PlatformRun:
 
         return self.finishMeasurement("beaglebone", em, doMeasure)
 
-    def atmega328p(self, fname, doMeasure=True):
+    def platform_atmega328p(self, fname, doMeasure=True):
         # Create temporary file and convert to hex file
         tf = tempfile.NamedTemporaryFile(delete=False)
         tf.close()
@@ -441,7 +453,7 @@ class PlatformRun:
             pass
         return self.finishMeasurement("atmega328p", em, doMeasure)
 
-    def xmegaa3buxplained(self, fname, doMeasure=True):
+    def platform_xmegaa3buxplained(self, fname, doMeasure=True):
         em = self.setupMeasurement("xmegaa3buxplained", doMeasure)
 
         # Create temporary file and convert to hex file
@@ -468,7 +480,7 @@ class PlatformRun:
             pass
         return self.finishMeasurement("xmegaa3buxplained", em, doMeasure)
 
-    def mspexp430f5529(self, fname, doMeasure=True):
+    def platform_mspexp430f5529(self, fname, doMeasure=True):
         em = self.setupMeasurement("msp-exp430f5529", doMeasure)
 
         self.foreground_proc("{} tilib -q \"prog {}\" &".format(
@@ -476,7 +488,7 @@ class PlatformRun:
 
         return self.finishMeasurement("msp-exp430f5529", em, doMeasure)
 
-    def mspexp430fr5739(self, fname, doMeasure=True):
+    def platform_mspexp430fr5739(self, fname, doMeasure=True):
         em = self.setupMeasurement("msp-exp430fr5739", doMeasure)
 
         self.foreground_proc("{} rf2500 \"prog {}\" &".format(
@@ -484,7 +496,7 @@ class PlatformRun:
 
         return self.finishMeasurement("msp-exp430fr5739", em, doMeasure)
 
-    def pic32mx250f128b(self, fname, doMeasure=True):
+    def platform_pic32mx250f128b(self, fname, doMeasure=True):
         # Create temporary file and convert to hex fil, doMeasuree
         tf = tempfile.NamedTemporaryFile(delete=False)
         tf.close()
@@ -500,7 +512,7 @@ class PlatformRun:
         return self.finishMeasurement("pic32mx250f128b", em, doMeasure)
 
     @killBgOnCtrlC
-    def sam4lxplained(self, fname, doMeasure=True):
+    def platform_sam4lxplained(self, fname, doMeasure=True):
         em = self.setupMeasurement("sam4lxplained", doMeasure)
 
         openocdproc = self.background_proc(
@@ -517,31 +529,12 @@ class PlatformRun:
         if not os.path.isfile(execname):
             raise IOError("File \"{}\" does not exist".format(execname))
 
-        if platformname == "stm32f0discovery":
-            m = self.stm32f0discovery(execname, measurement)
-        elif platformname == "stm32vldiscovery":
-            m = self.stm32vldiscovery(execname, measurement)
-        elif platformname == "stm32f4discovery":
-            m = self.stm32f4discovery(execname, measurement)
-        elif platformname == "stm32l0discovery":
-            m = self.stm32l0discovery(execname, measurement)
-        elif platformname == "beaglebone":
-            m = self.beaglebone(execname, measurement)
-        elif platformname == "atmega328p":
-            m = self.atmega328p(execname, measurement)
-        elif platformname == "xmegaa3buxplained":
-            m = self.xmegaa3buxplained(execname, measurement)
-        elif platformname == "pic32mx250f128b":
-            m = self.pic32mx250f128b(execname, measurement)
-        elif platformname == "msp-exp430f5529":
-            m = self.mspexp430f5529(execname, measurement)
-        elif platformname == "msp-exp430fr5739":
-            m = self.mspexp430fr5739(execname, measurement)
-        elif platformname == "sam4lxplained":
-            m = self.sam4lxplained(execname, measurement)
-        else:
+        mname = 'platform_{}'.format(platformname)
+        attr = getattr(self, mname, None)
+        if not callable(attr):
             raise RuntimeError("Unknown platform " + platformname)
-        return m
+
+        return attr(execname, measurement)
 
     def run_multiple(self, platformname, execname, repeats, measurement=True):
         measurements = []
