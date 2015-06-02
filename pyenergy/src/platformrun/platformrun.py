@@ -338,14 +338,13 @@ class PlatformRun:
 
     #######################################################################
 
-    @killBgOnCtrlC
     def platform_xmosslicekita16(self, fname, doMeasure=True):
         name = "xmosslicekita16"
         em = self.setupMeasurement(name, doMeasure)
 
-        xrunproc = self.background_proc(tool_config['tools']['xrun'] +
-                                        " --xscope")
-        self.kill_background_proc(xrunproc)
+        self.foreground_proc(tool_config['tools']['xrun'] +
+                             " --xscope " + fname)
+        # self.kill_background_proc(xrunproc)
 
         return self.finishMeasurement(name, em, doMeasure)
 
