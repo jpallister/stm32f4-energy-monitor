@@ -3,10 +3,12 @@
 
 Usage:
     platformrun [-v | -vv] [options] PLATFORM EXECUTABLE
+    platformrun -l
     platformrun -h
 
 Options:
     -h --help           Show this usage message
+    -l --list           List available platforms for use in PLATFORM argument
     -c --config CONF    Specify the measurement configuration to load
                             [default: ~/.measurementrc]
     -t --tools CONF     Config file for the tools needed to run on a platform
@@ -19,17 +21,6 @@ Options:
                         measurement points
 
     PLATFORM        Specify the platform on which to run.
-                    Available platforms are:
-                        stm32f0discovery
-                        stm32l0discovery
-                        stm32vldiscovery
-                        stm32f4discovery
-                        atmega328p
-                        xmegaa3buxplained
-                        msp-exp430f5529
-                        msp-exp430fr5739
-                        pic32mx250f128b
-                        sam4lxplained
 
 """
 from docopt import docopt
@@ -338,6 +329,14 @@ class PlatformRun:
 
     #######################################################################
 
+    def listPlatforms(self):
+        print "Available platforms:"
+        print '\n'.join(map(
+            lambda s: ' ' * 4 + s[9:],
+            filter(
+                lambda s: s.startswith('platform_') and
+                callable(getattr(self, s)), dir(self))))
+
     def platform_xmosslicekita16(self, fname, doMeasure=True):
         name = "xmosslicekita16"
         em = self.setupMeasurement(name, doMeasure)
@@ -556,6 +555,10 @@ def main():
         logging.getLogger('').setLevel(logging.DEBUG)
 
     PR = PlatformRun()
+
+    if arguments['--list']:
+        PR.listPlatforms()
+        return
 
     PR.loadConfiguration(arguments['--config'])
     PR.loadToolConfiguration(arguments['--tools'])
