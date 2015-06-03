@@ -86,7 +86,7 @@ class LogWriter(object):
         pass
 
 
-class PlatformRun():
+class PlatformRun:
     def __init__(self):
         self.bg_procs = []
         self.bg_proc_map = {}
