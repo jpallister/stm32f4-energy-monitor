@@ -44,10 +44,6 @@ warning = logger.warning
 info = logger.info
 debug = logger.debug
 
-
-tool_config = None
-measurement_config = None
-
 #######################################################################
 
 
@@ -91,6 +87,12 @@ class LogWriter(object):
 
 
 class PlatformRun:
+    def __init__(self):
+        self.bg_procs = []
+        self.bg_proc_map = {}
+        self.tool_config = None
+        self.measurement_config = None
+
     def gdb_launch(self, gdbname, port, fname, run_timeout=30,
                    post_commands=[], pre_commands=[]):
         info("Starting+connecting to gdb and loading file")
@@ -155,10 +157,6 @@ class PlatformRun:
 
         info("Quitting GDB")
         gdb.sendline("quit")
-
-    def __init__(self):
-        self.bg_procs = []
-        self.bg_proc_map = {}
 
     def background_proc(self, cmd, env=None):
 
@@ -225,21 +223,21 @@ class PlatformRun:
             return None
 
         # First check that all tools for platform are available
-        if platform not in tool_config['enabled']:
+        if platform not in self.tool_config['enabled']:
             raise RuntimeError(
                 "Platform {0} does not have all the tools configured. "
                 "Please rerun configure with --enable-{0}".format(platform))
 
         em = pyenergy.EnergyMonitor(
-            measurement_config[platform]['energy-monitor'])
+            self.measurement_config[platform]['energy-monitor'])
 
-        mp_cfg = measurement_config[platform]['measurement-point']
+        mp_cfg = self.measurement_config[platform]['measurement-point']
         if type(mp_cfg) is int:
             mpoints = [mp_cfg]
-            resistors = [measurement_config[platform]['resistor']]
+            resistors = [self.measurement_config[platform]['resistor']]
         elif type(mp_cfg) is list:
             mpoints = mp_cfg
-            resistors = measurement_config[platform]['resistor']
+            resistors = self.measurement_config[platform]['resistor']
         # mp = int(measurement_config[platform]['measurement-point'])
 
         em.connect()
@@ -247,7 +245,7 @@ class PlatformRun:
             em.enableMeasurementPoint(mp)
             em.clearNumberOfRuns(mp)
             em.measurement_params[mp]['resistor'] = float(resistor)
-            em.setTrigger(measurement_config[platform]['trigger-pin'], mp)
+            em.setTrigger(self.measurement_config[platform]['trigger-pin'], mp)
 
         return em
 
@@ -255,7 +253,7 @@ class PlatformRun:
         if not doMeasure:
             return None
 
-        mp_cfg = measurement_config[platform]['measurement-point']
+        mp_cfg = self.measurement_config[platform]['measurement-point']
         if type(mp_cfg) is int:
             mpoints = [mp_cfg]
             # resistors = [measurement_config[platform]['resistor']]
@@ -295,16 +293,12 @@ class PlatformRun:
     #######################################################################
 
     def loadConfiguration(self, fname="~/.measurementrc"):
-        global measurement_config
-
         fname = os.path.expanduser(fname)
-        measurement_config = json.load(open(fname))
+        self.measurement_config = json.load(open(fname))
 
     def loadToolConfiguration(self, fname="~/.platformrunrc"):
-        global tool_config
-
         fname = os.path.expanduser(fname)
-        tool_config = json.load(open(fname))
+        self.tool_config = json.load(open(fname))
 
     ##
 
@@ -341,7 +335,7 @@ class PlatformRun:
         name = "xmosslicekita16"
         em = self.setupMeasurement(name, doMeasure)
 
-        self.foreground_proc(tool_config['tools']['xrun'] +
+        self.foreground_proc(self.tool_config['tools']['xrun'] +
                              " --xscope " + fname)
         # self.kill_background_proc(xrunproc)
 
@@ -351,9 +345,9 @@ class PlatformRun:
     def platform_stm32f0discovery(self, fname, doMeasure=True):
         em = self.setupMeasurement("stm32f0discovery", doMeasure)
 
-        stproc = self.background_proc(tool_config['tools']['stutil'] +
+        stproc = self.background_proc(self.tool_config['tools']['stutil'] +
                                       " -s 2 -p 2001 -c 0x0bb11477 -v0")
-        self.gdb_launch(tool_config['tools']['arm_gdb'], 2001, fname)
+        self.gdb_launch(self.tool_config['tools']['arm_gdb'], 2001, fname)
         self.kill_background_proc(stproc)
 
         return self.finishMeasurement("stm32f0discovery", em, doMeasure)
@@ -362,9 +356,9 @@ class PlatformRun:
     def platform_stm32vldiscovery(self, fname, doMeasure=True):
         em = self.setupMeasurement("stm32vldiscovery", doMeasure)
 
-        stproc = self.background_proc(tool_config['tools']['stutil'] +
+        stproc = self.background_proc(self.tool_config['tools']['stutil'] +
                                       " -s 1 -p 2002 -c 0x1ba01477 -v0")
-        self.gdb_launch(tool_config['tools']['arm_gdb'], 2002, fname)
+        self.gdb_launch(self.tool_config['tools']['arm_gdb'], 2002, fname)
         self.ill_background_proc(stproc)
 
         return self.finishMeasurement("stm32vldiscovery", em, doMeasure)
@@ -373,9 +367,9 @@ class PlatformRun:
     def platform_stm32f4discovery(self, fname, doMeasure=True):
         em = self.setupMeasurement("stm32f4discovery", doMeasure)
 
-        stproc = self.background_proc(tool_config['tools']['stutil'] +
+        stproc = self.background_proc(self.tool_config['tools']['stutil'] +
                                       " -s 2 -p 2003 -c 0x2ba01477 -v0")
-        self.gdb_launch(tool_config['tools']['arm_gdb'], 2003, fname)
+        self.gdb_launch(self.tool_config['tools']['arm_gdb'], 2003, fname)
         self.kill_background_proc(stproc)
 
         return self.finishMeasurement("stm32f4discovery", em, doMeasure)
@@ -384,10 +378,10 @@ class PlatformRun:
     def platform_stm32l0discovery(self, fname, doMeasure=True):
         em = self.setupMeasurement("stm32l0discovery", doMeasure)
 
-        stproc = self.background_proc(tool_config['tools']['openocd'] +
+        stproc = self.background_proc(self.tool_config['tools']['openocd'] +
                                       ' -f board/stm32l0discovery.cfg '
                                       '--command "gdb_port 2004"')
-        self.gdb_launch(tool_config['tools']['arm_gdb'], 2004, fname,
+        self.gdb_launch(self.tool_config['tools']['arm_gdb'], 2004, fname,
                         post_commands=["monitor shutdown"],
                         pre_commands=["monitor reset init"])
         self.kill_background_proc(stproc)
@@ -398,9 +392,10 @@ class PlatformRun:
     def platform_beaglebone(self, fname, doMeasure=True):
         em = self.setupMeasurement("beaglebone", doMeasure)
 
-        openocdproc = self.background_proc(tool_config['tools']['openocd'] +
-                                           " -f board/ti_beaglebone.cfg")
-        self.gdb_launch(tool_config['tools']['arm_gdb'], 3333, fname,
+        openocdproc = self.background_proc(
+            self.tool_config['tools']['openocd'] +
+            " -f board/ti_beaglebone.cfg")
+        self.gdb_launch(self.tool_config['tools']['arm_gdb'], 3333, fname,
                         post_commands=["monitor shutdown"],
                         pre_commands=["monitor reset halt"])
         self.kill_background_proc(openocdproc)
@@ -412,7 +407,7 @@ class PlatformRun:
         tf = tempfile.NamedTemporaryFile(delete=False)
         tf.close()
         self.foreground_proc(
-            "{} -O ihex {} {}".format(tool_config['tools']['avr_objcopy'],
+            "{} -O ihex {} {}".format(self.tool_config['tools']['avr_objcopy'],
                                       fname, tf.name))
 
         # Flash the hex file to the AVR chip
@@ -423,7 +418,7 @@ class PlatformRun:
         else:
             silence = "-q -q" """
 
-        ser_id = measurement_config['atmega328p']['serial-dev-id']
+        ser_id = self.measurement_config['atmega328p']['serial-dev-id']
         ser_path = "/dev/serial/by-id/{}".format(ser_id)
 
         if not os.path.exists(ser_path):
@@ -435,14 +430,14 @@ class PlatformRun:
 
         # info("Perform erase of the chip")
         # cmdline = "{} -F -c arduino -p atmega328p -e -P {} -b 115200".format(
-        # tool_config['tools']['avrdude'], location)
+        # self.tool_config['tools']['avrdude'], location)
         # self.foreground_proc(cmdline)
 
         em = self.setupMeasurement("atmega328p", doMeasure)
 
         cmdline = ("{} -F -V -c arduino -p atmega328p -P {} -b 115200"
                    "-U flash:w:{}").format(
-                       tool_config['tools']['avrdude'], location, tf.name)
+                       self.tool_config['tools']['avrdude'], location, tf.name)
         self.foreground_proc(cmdline)
 
         try:
@@ -458,7 +453,7 @@ class PlatformRun:
         tf = tempfile.NamedTemporaryFile(delete=False)
         tf.close()
         self.foreground_proc("{} -O ihex {} {}".format(
-            tool_config['tools']['avr_objcopy'], fname, tf.name))
+            self.tool_config['tools']['avr_objcopy'], fname, tf.name))
 
         # Flash the hex file to the AVR chip
         """if logger.getEffectiveLevel() == logging.DEBUG:
@@ -469,7 +464,7 @@ class PlatformRun:
             silence = "-q -q" """
 
         cmdline = "{} -F -V -c jtag3 -p x256a3bu -e -U flash:w:{}".format(
-            tool_config['tools']['avrdude'], tf.name)
+            self.tool_config['tools']['avrdude'], tf.name)
         self.foreground_proc(cmdline)
 
         try:
@@ -482,7 +477,7 @@ class PlatformRun:
         em = self.setupMeasurement("msp-exp430f5529", doMeasure)
 
         self.foreground_proc("{} tilib -q \"prog {}\" &".format(
-            tool_config['tools']['mspdebug'], fname))
+            self.tool_config['tools']['mspdebug'], fname))
 
         return self.finishMeasurement("msp-exp430f5529", em, doMeasure)
 
@@ -490,7 +485,8 @@ class PlatformRun:
         em = self.setupMeasurement("msp-exp430fr5739", doMeasure)
 
         self.foreground_proc("{} rf2500 \"prog {}\" &".format(
-            tool_config['tools']['mspdebug'], fname), expected_returncode=None)
+            self.tool_config['tools']['mspdebug'], fname),
+            expected_returncode=None)
 
         return self.finishMeasurement("msp-exp430fr5739", em, doMeasure)
 
@@ -499,12 +495,12 @@ class PlatformRun:
         tf = tempfile.NamedTemporaryFile(delete=False)
         tf.close()
         self.foreground_proc("{} -O ihex {} {}".format(
-            tool_config['tools']['pic32_objcopy'], fname, tf.name))
+            self.tool_config['tools']['pic32_objcopy'], fname, tf.name))
 
         # Program the PIC and leave power on to run test
         em = self.setupMeasurement("pic32mx250f128b")
         self.foreground_proc(
-            "{} -p {}".format(tool_config['tools']['pic32prog'], tf.name))
+            "{} -p {}".format(self.tool_config['tools']['pic32prog'], tf.name))
 
         os.unlink(tf.name)
         return self.finishMeasurement("pic32mx250f128b", em, doMeasure)
@@ -514,9 +510,9 @@ class PlatformRun:
         em = self.setupMeasurement("sam4lxplained", doMeasure)
 
         openocdproc = self.background_proc(
-            tool_config['tools']['openocd'] +
+            self.tool_config['tools']['openocd'] +
             " -f board/atmel_sam4l8_xplained_pro.cfg")
-        self.gdb_launch(tool_config['tools']['arm_gdb'], 3333, fname,
+        self.gdb_launch(self.tool_config['tools']['arm_gdb'], 3333, fname,
                         post_commands=["monitor shutdown"])
         self.kill_background_proc(openocdproc)
 
@@ -577,8 +573,8 @@ def main():
         quit(1)
 
     if arguments['--no-measure'] is False:
-        global measurement_config
-        split = measurement_config[arguments['PLATFORM']].get('split', False)
+        split = PR.measurement_config[arguments['PLATFORM']].get('split',
+                                                                 False)
         if arguments['--csv']:
             if (arguments['-s'] or split) and hasattr(m, "measurements"):
                 for n, meas in enumerate(m.measurements):
