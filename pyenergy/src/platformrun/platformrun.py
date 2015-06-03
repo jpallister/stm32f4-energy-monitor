@@ -18,7 +18,7 @@ Options:
     --no-measure        Don't measure anything
     --csv               Print as csv
     -s                  Split energy measurements when board using multiple
-                        measurement points
+                        measurement points (overrides measurementrc)
 
     PLATFORM        Specify the platform on which to run.
 
@@ -577,12 +577,19 @@ def main():
         quit(1)
 
     if arguments['--no-measure'] is False:
+        global measurement_config
+        split = measurement_config[arguments['PLATFORM']].get('split', False)
         if arguments['--csv']:
-            print ("{m.energy}, {m.time}, {m.avg_power}, {m.avg_current}, "
-                   "{m.avg_voltage}").format(m=m)
+            if (arguments['-s'] or split) and hasattr(m, "measurements"):
+                for n, meas in enumerate(m.measurements):
+                    print (
+                        "{}, {m.energy}, {m.time}, {m.avg_power}, "
+                        "{m.avg_current}, {m.avg_voltage}").format(n+1, m=meas)
+            else:
+                print ("{m.energy}, {m.time}, {m.avg_power}, {m.avg_current}, "
+                       "{m.avg_voltage}").format(m=m)
         else:
-            if arguments['-s'] and hasattr(m, "measurements"):
-
+            if (arguments['-s'] or split) and hasattr(m, "measurements"):
                 s = "       "
                 for i in range(len(m.measurements)):
                     s += "           {}".format(i+1)
