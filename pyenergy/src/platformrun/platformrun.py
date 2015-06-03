@@ -195,12 +195,16 @@ class PlatformRun:
         sleep(0.1)
         self.bg_procs.remove(p)
 
-    def foreground_proc(self, cmd, expected_returncode=0):
+    def foreground_proc(self, cmd, expected_returncode=0, collect=False):
         info("Starting foreground proc: \"{}\"".format(cmd))
 
         proclogger = logger.getChild(cmd.split(' ')[0])
 
-        proc = pexpect.spawn(cmd, logfile=LogWriter(proclogger, logging.DEBUG))
+        if collect:
+            logfile = None
+        else:
+            logfile = LogWriter(proclogger, logging.DEBUG)
+        proc = pexpect.spawn(cmd, logfile=logfile)
 
         proc.expect(pexpect.EOF)
 
@@ -217,6 +221,7 @@ class PlatformRun:
             raise CommandError(
                 "Command \"{}\" returned {}".format(cmd, proc.exitstatus))
         info("Foreground proc complete")
+        return proc.before
 
     def setupMeasurement(self, platform, doMeasure=True):
         if not doMeasure:
@@ -331,15 +336,19 @@ class PlatformRun:
                 lambda s: s.startswith('platform_') and
                 callable(getattr(self, s)), dir(self))))
 
-    def platform_xmosslicekita16(self, fname, doMeasure=True):
+    def platform_xmosslicekita16(self, fname, doMeasure=True, collect=False):
         name = "xmosslicekita16"
         em = self.setupMeasurement(name, doMeasure)
 
-        self.foreground_proc(self.tool_config['tools']['xrun'] +
-                             " --xscope " + fname)
-        # self.kill_background_proc(xrunproc)
-
-        return self.finishMeasurement(name, em, doMeasure)
+        output = self.foreground_proc(self.tool_config['tools']['xrun'] +
+                                      " --xscope " + fname, collect=collect)
+        m = self.finishMeasurement(name, em, doMeasure)
+        if collect:
+            ret = m, output
+        else:
+            ret = m
+        print collect, ret
+        return ret
 
     @killBgOnCtrlC
     def platform_stm32f0discovery(self, fname, doMeasure=True):
@@ -518,7 +527,7 @@ class PlatformRun:
 
         return self.finishMeasurement("sam4lxplained", em, doMeasure)
 
-    def run(self, platformname, execname, measurement=True):
+    def run(self, platformname, execname, measurement=True, collect=False):
 
         if not os.path.isfile(execname):
             raise IOError("File \"{}\" does not exist".format(execname))
@@ -528,7 +537,7 @@ class PlatformRun:
         if not callable(attr):
             raise RuntimeError("Unknown platform " + platformname)
 
-        return attr(execname, measurement)
+        return attr(execname, measurement, collect)
 
     def run_multiple(self, platformname, execname, repeats, measurement=True):
         measurements = []
