@@ -200,10 +200,7 @@ class PlatformRun:
 
         proclogger = logger.getChild(cmd.split(' ')[0])
 
-        if collect:
-            logfile = None
-        else:
-            logfile = LogWriter(proclogger, logging.DEBUG)
+        logfile = LogWriter(proclogger, logging.DEBUG)
         proc = pexpect.spawn(cmd, logfile=logfile)
 
         proc.expect(pexpect.EOF)
@@ -347,7 +344,6 @@ class PlatformRun:
             ret = m, output
         else:
             ret = m
-        print collect, ret
         return ret
 
     @killBgOnCtrlC
