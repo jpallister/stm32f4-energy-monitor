@@ -86,7 +86,7 @@ class LogWriter(object):
         pass
 
 
-class PlatformRun:
+class PlatformRun():
     def __init__(self):
         self.bg_procs = []
         self.bg_proc_map = {}
@@ -324,6 +324,17 @@ class PlatformRun:
         return ""
 
     #######################################################################
+
+    def __getattr__(self, name):
+        """
+            Handle old-style requests to self.platformname(...)
+        """
+        newname = 'platform_' + name
+        if newname in dir(PlatformRun):
+            attr = getattr(self, newname)
+            if callable(attr):
+                return attr
+        raise AttributeError
 
     def listPlatforms(self):
         print "Available platforms:"
