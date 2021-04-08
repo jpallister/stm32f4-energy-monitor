@@ -31,7 +31,7 @@ Commands:
                     serial to NEWSERIAL
 
     interactive     Start up the interactive graph view, for energy monitor
-                    SERIAL. This requires PyQt4 to be installed.
+                    SERIAL. This requires PyQt5 to be installed.
 
 Options:
     -m --measurement MPOINT     Specify a measurement point to use (up to 3)
@@ -41,7 +41,7 @@ Options:
     -v LEVEL                    Verbosity level: 0, 1 or 2 [default: 0]
 """
 from docopt import docopt
-import pyenergy
+from . import pyenergy
 from time import sleep
 import usb.util
 import textwrap, string
@@ -61,11 +61,11 @@ def prettyPrint(v):
     return "{}".format(v)
 
 def display(m):
-    print "Energy:          {}J".format(prettyPrint(m.energy))
-    print "Time:            {}s".format(prettyPrint(m.time))
-    print "Power:           {}W".format(prettyPrint(m.avg_power))
-    print "Average current: {}A".format(prettyPrint(m.avg_current))
-    print "Average voltage: {}V".format(prettyPrint(m.avg_voltage))
+    print("Energy:          {}J".format(prettyPrint(m.energy)))
+    print("Time:            {}s".format(prettyPrint(m.time)))
+    print("Power:           {}W".format(prettyPrint(m.avg_power)))
+    print("Average current: {}A".format(prettyPrint(m.avg_current)))
+    print("Average voltage: {}V".format(prettyPrint(m.avg_voltage)))
 
 
 def read(serial, pin, mpoints):
@@ -83,21 +83,21 @@ def read(serial, pin, mpoints):
 
     for mp in mpoints:
         m = em.getMeasurement(mp)
-        print "Measurement point",mp
+        print("Measurement point",mp)
         display(m)
-        print ""
+        print("")
 
 def continuous(serial, mpoints, delay=0.1):
     em = pyenergy.EnergyMonitor(serial)
     em.connect()
 
-    print "time,",
+    print("time,", end=' ')
 
     for mp in mpoints:
         em.enableMeasurementPoint(mp)
         em.start(mp)
-        print "energy_{0}, power_{0}, avg_current_{0}, avg_voltage_{0},".format(mp),
-    print ""
+        print("energy_{0}, power_{0}, avg_current_{0}, avg_voltage_{0},".format(mp), end=' ')
+    print("")
 
     try:
         while True:
@@ -106,9 +106,9 @@ def continuous(serial, mpoints, delay=0.1):
                 m = em.getMeasurement(mp)
 
                 if first:
-                    print m.time,
-                print "{}, {}, {}, {},".format(m.energy, m.energy/m.time, m.avg_current, m.avg_voltage),
-            print ""
+                    print(m.time, end=' ')
+                print("{}, {}, {}, {},".format(m.energy, m.energy/m.time, m.avg_current, m.avg_voltage), end=' ')
+            print("")
             sleep(delay)
     except KeyboardInterrupt:
         for mp in mpoints:
@@ -128,9 +128,9 @@ def debug(serial, mpoints, delay=0.1):
         while True:
             for mp in mpoints:
                 meas = em.getInstantaneous(mp)
-                print "Measurement point:", mp
+                print("Measurement point:", mp)
                 em.debugInstantaneous(meas)
-            print ""
+            print("")
             sleep(delay)
     except KeyboardInterrupt:
         for mp in mpoints:
@@ -141,12 +141,12 @@ def debug(serial, mpoints, delay=0.1):
 def list_boards():
     devs = pyenergy.EnergyMonitor.getBoards()
 
-    print "Connected energy monitors:"
+    print("Connected energy monitors:")
 
     if len(devs) > 0:
-        print "    Serial  API"
+        print("    Serial  API")
     else:
-        print "    None :("
+        print("    None :(")
 
     for d in devs:
         try:
@@ -166,7 +166,7 @@ def list_boards():
         if v < pyenergy.EnergyMonitor.newestVersion:
             v = "{} (Please update firmware)".format(v)
 
-        print "    {: <8} {}".format(serial, v)
+        print("    {: <8} {}".format(serial.decode('utf-8'), v))
 
 def change_serial(oldser, newser):
     em = pyenergy.EnergyMonitor(oldser)
@@ -182,7 +182,7 @@ def preinput(text):
 
 def get_input(prompt, initial=""):
     readline.set_pre_input_hook(preinput(initial))
-    inp = raw_input(prompt)
+    inp = input(prompt)
     # stdout.write(reset)
     return inp
 
@@ -198,12 +198,12 @@ def choice(prompt, choices, initial=""):
             for c in choices:
                 if c.isupper():
                     return c.lower()
-        elif sel.lower() in map(string.lower, choices):
+        elif sel.lower() in list(map(str.lower, choices)):
             return sel.lower()
 
 def setup():
     list_boards()
-    print ""
+    print("")
 
     text=textwrap.dedent("""
         This program will prompt you for the connections between the measurement
@@ -214,13 +214,13 @@ def setup():
         This information is stored in the ~/.measurementrc file. The existing
         config will now be loaded (if there is one), allowing you edit it.
         """)
-    print text
+    print(text)
 
     cfg = os.path.expanduser("~/.measurementrc")
     if os.path.exists(cfg):
         config = json.load(open(cfg))
     else:
-        print "Configuration file does not exist, creating new config"
+        print("Configuration file does not exist, creating new config")
         config = {}
 
 
@@ -238,8 +238,8 @@ def setup():
             else:
                 pchoices = list(config.keys())
 
-            pstrchoices = map(lambda (i, s): "\t[{}] {}".format(i, s), enumerate(pchoices))
-            cchoices = "".join(map(str, range(len(pchoices))))
+            pstrchoices = ["\t[{}] {}".format(i_s[0], i_s[1]) for i_s in enumerate(pchoices)]
+            cchoices = "".join(map(str, list(range(len(pchoices)))))
 
             c1 = choice("Select the platform:\n" + "\n".join(pstrchoices) + "\n ? ", cchoices)
             c1 = int(c1)
@@ -262,9 +262,9 @@ def setup():
                 ser = get_input("Serial of energy monitor connected to {}: ".format(platform), initial=default_ser)
 
             if platform == "beaglebone":
-                print "All measurement points needed for beagle bone, autoselecting following config:"
-                print "    Measurement points: 1 (DDR), 2 (MPU), 3 (CORE)"
-                print "    Resistors         : 0.5,     0.05,    0.05"
+                print("All measurement points needed for beagle bone, autoselecting following config:")
+                print("    Measurement points: 1 (DDR), 2 (MPU), 3 (CORE)")
+                print("    Resistors         : 0.5,     0.05,    0.05")
                 mp = [1,2,3]
                 res = [0.5, 0.05, 0.05]
             else:
@@ -284,12 +284,12 @@ def setup():
                 sdi = get_input("ATMEGA328P requires the id of the serial-USB adapter. This can be\nfound in /dev/serial/by-id/\n ? ")
                 config[platform]['serial-dev-id'] = str(sdi)
 
-            print ""
+            print("")
         if c == 'd':
             pchoices = list(config.keys())
 
-            pstrchoices = map(lambda (i, s): "\t[{}] {}".format(i, s), enumerate(pchoices))
-            cchoices = "".join(map(str, range(len(pchoices))))
+            pstrchoices = ["\t[{}] {}".format(i_s1[0], i_s1[1]) for i_s1 in enumerate(pchoices)]
+            cchoices = "".join(map(str, list(range(len(pchoices)))))
 
             c1 = choice("Select the platform:\n" + "\n".join(pstrchoices) + "\n ? ", cchoices)
             c1 = int(c1)
@@ -313,7 +313,7 @@ def main():
         logging.getLogger('').setLevel(logging.DEBUG)
         logging.debug("test")
 
-    mpoints = map(int, set(arguments['--measurement']))
+    mpoints = list(map(int, set(arguments['--measurement'])))
 
     if arguments['read']:
         read(arguments['SERIAL'], arguments['PIN'], mpoints)
@@ -329,11 +329,11 @@ def main():
         change_serial(arguments['SERIAL'], arguments['NEWSERIAL'])
     elif arguments['interactive']:
         try:
-            import PyQt4
+            import PyQt5
         except ImportError:
-            print "Error: please install PyQt4"
+            print("Error: please install PyQt5")
             quit()
-        import interactive_graph
+        from . import interactive_graph
         interactive_graph.main(arguments['SERIAL'])
 
 if __name__=="__main__":

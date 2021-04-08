@@ -266,7 +266,7 @@ def finishMeasurement(platform, em, doMeasure=True, timeout=30):
 
 
     if type(mp_cfg) is list:
-        measurements = map(em.getMeasurement, mpoints)
+        measurements = list(map(em.getMeasurement, mpoints))
         m = pyenergy.MeasurementSet(measurements)
     else:
         m = em.getMeasurement(mp)
@@ -306,7 +306,7 @@ def findUSBLocation(devid):
     for bus in usb.busses():
         for dev in bus.devices:
             try:
-                print
+                print()
                 if devid.lower() == "{:04x}:{:04x}".format(dev.idVendor, dev.idProduct):
                     addr = "{:03}:{:03}".format(dev.dev.bus, dev.dev.address)
                     info("Found {}".format(addr))
@@ -542,36 +542,36 @@ def main():
 
         m = sum(ms) / len(ms)
     except (IOError, RuntimeError) as e:
-        print "Error:",e
+        print("Error:",e)
         quit(1)
 
     if arguments['--no-measure'] is False:
         if arguments['--csv']:
-            print "{m.energy}, {m.time}, {m.avg_power}, {m.avg_current}, {m.avg_voltage}".format(m=m)
+            print("{m.energy}, {m.time}, {m.avg_power}, {m.avg_current}, {m.avg_voltage}".format(m=m))
         else:
             if arguments['-s'] and hasattr(m,"measurements"):
 
                 s = "       "
                 for i in range(len(m.measurements)):
                     s += "           {}".format(i+1)
-                print s
+                print(s)
 
                 names = ["Energy", "Time", "Power", "Average current", "Average voltage"]
                 keys = ["energy", "time", "avg_power", "avg_current", "avg_voltage"]
                 units = ["J", "s", "W", "A", "V"]
 
                 for name,key,unit in zip(names, keys, units):
-                    print "{}:{}".format(name, " " *(15-len(name))),
+                    print("{}:{}".format(name, " " *(15-len(name))), end=' ')
                     for meas in m.measurements:
-                        print "{}{}".format(prettyPrint(meas.__dict__[key]), unit),
-                    print
+                        print("{}{}".format(prettyPrint(meas.__dict__[key]), unit), end=' ')
+                    print()
 
             else:
-                print "Energy:          {}J".format(prettyPrint(m.energy))
-                print "Time:            {}s".format(prettyPrint(m.time))
-                print "Power:           {}W".format(prettyPrint(m.avg_power))
-                print "Average current: {}A".format(prettyPrint(m.avg_current))
-                print "Average voltage: {}V".format(prettyPrint(m.avg_voltage))
+                print("Energy:          {}J".format(prettyPrint(m.energy)))
+                print("Time:            {}s".format(prettyPrint(m.time)))
+                print("Power:           {}W".format(prettyPrint(m.avg_power)))
+                print("Average current: {}A".format(prettyPrint(m.avg_current)))
+                print("Average voltage: {}V".format(prettyPrint(m.avg_voltage)))
 
 if __name__ == "__main__":
     main()

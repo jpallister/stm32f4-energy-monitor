@@ -16,13 +16,13 @@ class checkOutput(object):
 
             m = em.getMeasurement(self.m_point)
 
-            print "\tChecking measurement point", self.m_point, "...",
+            print("\tChecking measurement point", self.m_point, "...", end=' ')
 
             result = True
 
             res = resistors[self.m_point-1]
             if res is None:
-                print "Cannot check - no resistor"
+                print("Cannot check - no resistor")
                 return True # Can't test it because it could be floating. Assume it worked
             else:
                 # Calculate expected values
@@ -49,9 +49,9 @@ class checkOutput(object):
             result = result and self.checkBound(ai, m.avg_current, "Error in average current,   Expected:{expected}, Got:{test}")
 
             if not result:
-                print "Failed"
+                print("Failed")
             else:
-                print "Passed"
+                print("Passed")
             return result
         return wrap
 
@@ -59,7 +59,7 @@ class checkOutput(object):
         if bounds == None:
             bounds = self.bounds
         if test < expected * (1 - bounds) - noise or test > expected * (1 + bounds) + noise:
-            print msg.format(test=test, expected=expected)
+            print(msg.format(test=test, expected=expected))
             return False
         return True
 
@@ -83,7 +83,7 @@ class testName(object):
 
     def __call__(self, f):
         def wrap(em, *args):
-            print "Running test:",self.name
+            print("Running test:",self.name)
             return f(em, *args)
         return wrap
 

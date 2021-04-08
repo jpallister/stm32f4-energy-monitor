@@ -1,2 +1,2 @@
-from platformrun import *
-import detect
+from .platformrun import *
+from . import detect

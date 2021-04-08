@@ -1,5 +1,5 @@
 
-from pyenergy import *
-import tools
-import upgrade
+from .pyenergy import *
+from . import tools
+from . import upgrade
 # import interactive_graph
