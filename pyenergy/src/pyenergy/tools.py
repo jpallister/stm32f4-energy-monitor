@@ -31,7 +31,7 @@ Commands:
                     serial to NEWSERIAL
 
     interactive     Start up the interactive graph view, for energy monitor
-                    SERIAL. This requires PyQt4 to be installed.
+                    SERIAL. This requires PyQt5 to be installed.
 
 Options:
     -m --measurement MPOINT     Specify a measurement point to use (up to 3)
@@ -166,7 +166,7 @@ def list_boards():
         if v < pyenergy.EnergyMonitor.newestVersion:
             v = "{} (Please update firmware)".format(v)
 
-        print("    {: <8} {}".format(serial, v))
+        print("    {: <8} {}".format(serial.decode('utf-8'), v))
 
 def change_serial(oldser, newser):
     em = pyenergy.EnergyMonitor(oldser)
@@ -198,7 +198,7 @@ def choice(prompt, choices, initial=""):
             for c in choices:
                 if c.isupper():
                     return c.lower()
-        elif sel.lower() in list(map(string.lower, choices)):
+        elif sel.lower() in list(map(str.lower, choices)):
             return sel.lower()
 
 def setup():
@@ -329,9 +329,9 @@ def main():
         change_serial(arguments['SERIAL'], arguments['NEWSERIAL'])
     elif arguments['interactive']:
         try:
-            import PyQt4
+            import PyQt5
         except ImportError:
-            print("Error: please install PyQt4")
+            print("Error: please install PyQt5")
             quit()
         from . import interactive_graph
         interactive_graph.main(arguments['SERIAL'])

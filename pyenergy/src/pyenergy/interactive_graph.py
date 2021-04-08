@@ -1,6 +1,7 @@
 import sys, os, random
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
 
 import matplotlib
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
@@ -125,7 +126,7 @@ class Graph(QMainWindow):
         self.timeslider.setValue(self.tinterval*1000)
         self.timeslider.setTickInterval(1)
         self.timeslider.setSingleStep(1)
-        self.connect(self.timeslider, SIGNAL('valueChanged(int)'), self.updatesliders)
+        self.timeslider.valueChanged.connect(self.updatesliders)
         grid.addWidget(self.timeslider, 2, 0)
 
         # Add window slider
@@ -136,7 +137,7 @@ class Graph(QMainWindow):
         self.windowslider.setValue(self.wsize)
         self.windowslider.setTickInterval(1)
         self.windowslider.setSingleStep(1)
-        self.connect(self.windowslider, SIGNAL('valueChanged(int)'), self.updatesliders)
+        self.windowslider.valueChanged.connect(self.updatesliders)
         grid.addWidget(self.windowslider, 4, 0)
 
         # Add graph selector
@@ -144,7 +145,7 @@ class Graph(QMainWindow):
         self.graphselect = QComboBox()
         self.graphselect.addItems(["Combined", "Horizontal", "Vertical"])
         self.graphselect.setCurrentIndex(0)
-        self.connect(self.graphselect, SIGNAL('currentIndexChanged(int)'), self.changegraph)
+        self.graphselect.currentIndexChanged.connect(self.changegraph)
         grid.addWidget(self.graphselect, 6,0)
 
         box = QGroupBox("General")
@@ -302,13 +303,13 @@ class Graph(QMainWindow):
         bbox_props = dict(boxstyle="round", fc="w", ec="0.5", alpha=0.8)
         for i,(mp, vals) in enumerate(sorted(self.data.items())):
             if self.state[mp][1]:
-                l = self.axes.text(vals["xdata"][-1] - toff/2, np.mean(vals["idata"][-self.wsize/10:]), self.state[mp][4], ha="right", bbox=bbox_props)
+                l = self.axes.text(vals["xdata"][-1] - toff/2, np.mean(vals["idata"][int(-self.wsize/10):]), self.state[mp][4], ha="right", bbox=bbox_props)
                 self.plots.append(l)
             if self.state[mp][2]:
-                l = self.vaxes.text(vals["xdata"][-1] - toff/2, np.mean(vals["vdata"][-self.wsize/10:]), self.state[mp][4], ha="right", bbox=bbox_props)
+                l = self.vaxes.text(vals["xdata"][-1] - toff/2, np.mean(vals["vdata"][int(-self.wsize/10):]), self.state[mp][4], ha="right", bbox=bbox_props)
                 self.plots.append(l)
             if self.state[mp][3]:
-                l = self.paxes.text(vals["xdata"][-1] - toff/2, np.mean(vals["pdata"][-self.wsize/10:]), self.state[mp][4], ha="right", bbox=bbox_props)
+                l = self.paxes.text(vals["xdata"][-1] - toff/2, np.mean(vals["pdata"][int(-self.wsize/10):]), self.state[mp][4], ha="right", bbox=bbox_props)
                 self.plots.append(l)
 
         self.canvas.draw()

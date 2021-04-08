@@ -242,7 +242,6 @@ class EnergyMonitor(object):
 
     def __init__(self, serial="EE00"):
         devs = self.getBoards()
-
         sdevs = []
         for d in devs:
             try:
@@ -342,7 +341,7 @@ class EnergyMonitor(object):
 
         b = dev.ctrl_transfer(0xc3, 13, 0, 0, 4)
         serial = unpack("=4s", b)[0]
-        return serial
+        return serial.decode('utf-8')
 
     # Toggle the LEDs on the device
     def toggleLEDs(self):
