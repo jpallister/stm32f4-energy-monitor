@@ -17,7 +17,7 @@ import numpy as np
 import scipy
 import scipy.stats
 
-import pyenergy
+from . import pyenergy
 
 class Graph(QMainWindow):
     def __init__(self, em, parent=None):
@@ -211,9 +211,9 @@ class Graph(QMainWindow):
     def updatesliders(self):
         self.tinterval = self.timeslider.value() / 1000.
         self.wsize = self.windowslider.value()
-        print self.tinterval, self.wsize
+        print(self.tinterval, self.wsize)
         self.setUpdate()
-        print self.tinterval
+        print(self.tinterval)
 
     def changegraph(self):
         ind = self.graphselect.currentIndex()
@@ -244,7 +244,7 @@ class Graph(QMainWindow):
 
         n_points = [0,0,0]
 
-        for s in self.state.values():
+        for s in list(self.state.values()):
             n_points[0] += s[1]
             n_points[1] += s[2]
             n_points[2] += s[3]
@@ -257,7 +257,7 @@ class Graph(QMainWindow):
 
         for i,(mp, vals) in enumerate(sorted(self.data.items())):
             # Calculate the number of samples in the window
-            n = int(len(filter(lambda x: x >= vals["xdata"][-1] - self.tinterval*self.wsize, vals['xdata']))*1.1)
+            n = int(len([x for x in vals['xdata'] if x >= vals["xdata"][-1] - self.tinterval*self.wsize])*1.1)
 
             if self.state[mp][1]:
                 p1,  = self.axes.plot(vals["xdata"], vals["idata"], linestyles[0][i], color='g')
@@ -348,7 +348,7 @@ class Graph(QMainWindow):
 
     def getState(self):
         state = collections.defaultdict(list)
-        for mp, vals in self.controls.items():
+        for mp, vals in list(self.controls.items()):
             for i, control in enumerate(vals):
                 if i == 0:
                     state[mp].append(control.currentIndex())
@@ -409,7 +409,7 @@ class Graph(QMainWindow):
             base_t = 0
 
         problem = False
-        for mp, m in measurements.items():
+        for mp, m in list(measurements.items()):
                 i = {"1": 1, "2":2, "3":3, "Self":4}[mp]
                 res = self.em.measurement_params[i]['resistor']
                 vref = self.em.measurement_params[i]['vref']

@@ -81,7 +81,7 @@ class MeasurementSet(object):
 
     def __repr__(self):
         keys = ["energy", "time", "peak_power", "peak_voltage", "peak_current", "n_samples", "avg_voltage", "avg_current", "avg_power"]
-        vals = ", ".join(map(lambda x: "{}={}".format(x,self.__dict__[x]), keys))
+        vals = ", ".join(["{}={}".format(x,self.__dict__[x]) for x in keys])
         return "MeasurementSet({} measurements, {})".format(len(self.measurements), vals)
 
     def __eq__(self, rhs):
@@ -148,7 +148,7 @@ class Measurement(object):
         return self._op(other, operator.div)
 
     def __repr__(self):
-        return "Measurement(" + ", ".join(map("{0[0]}={0[1]}".format, self.__dict__.items())) + ")"
+        return "Measurement(" + ", ".join(map("{0[0]}={0[1]}".format, list(self.__dict__.items()))) + ")"
 
     def __eq__(self, rhs):
         params = ["energy", "time", "peak_power", "peak_voltage", "peak_current",
@@ -247,7 +247,7 @@ class EnergyMonitor(object):
         for d in devs:
             try:
                 d.set_configuration()
-            except usb.core.USBError, e:
+            except usb.core.USBError as e:
                 warning("Could not access one of the boards")
                 warning(str(e))
             v = self.getVersion(d)
@@ -555,17 +555,17 @@ class EnergyMonitor(object):
         gain = self.measurement_params[mp]['gain']
         vref = self.measurement_params[mp]['vref']
 
-        print "Timestamp:", v[4] * 2. / 168000000 * 2
-        print "Current:  Raw={:4d}  Voltage@{}={:1.3f}V  Res Vdrop={:1.5f}V  Current={:1.5f}A".format(mp,
+        print("Timestamp:", v[4] * 2. / 168000000 * 2)
+        print("Current:  Raw={:4d}  Voltage@{}={:1.3f}V  Res Vdrop={:1.5f}V  Current={:1.5f}A".format(mp,
             EnergyMonitor.port_mappings[mp][1],
             v[3]/4096.*vref,
             float(vref) / gain / 4096. * v[3],
-            float(vref) / gain / resistor / 4096. * v[3])
-        print "Voltage:  Raw={:4d}  Voltage@{}={:1.3f}V                      Voltage={:1.5f}V".format(v[2],
+            float(vref) / gain / resistor / 4096. * v[3]))
+        print("Voltage:  Raw={:4d}  Voltage@{}={:1.3f}V                      Voltage={:1.5f}V".format(v[2],
             EnergyMonitor.port_mappings[mp][0],
             v[2]/4096.*vref,
-            float(vref) / 4096. * v[2] * 2)
-        print ""
+            float(vref) / 4096. * v[2] * 2))
+        print("")
 
     def disconnect(self):
         """For now this doesn't do anything"""
@@ -587,9 +587,9 @@ if __name__ == "__main__":
     em.setTrigger("PA0", 1)
     em.setTrigger("PA0", 2)
 
-    print "*** Press the blue button to make a measurement"
+    print("*** Press the blue button to make a measurement")
 
     while True:
         while not em.measurementCompleted(): sleep(0.1)
-        print em.getMeasurement(1)
-        print em.getMeasurement(2)
+        print(em.getMeasurement(1))
+        print(em.getMeasurement(2))

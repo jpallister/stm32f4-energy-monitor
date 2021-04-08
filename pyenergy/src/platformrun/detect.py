@@ -127,7 +127,7 @@ def detect_prog(progname, prompt=False):
         preinput(progname)
 
         while True:
-            path = raw_input("Enter location of \"{}\"\n > ".format(progname))
+            path = input("Enter location of \"{}\"\n > ".format(progname))
 
             if path == "":
                 f = None
@@ -140,13 +140,13 @@ def detect_prog(progname, prompt=False):
                     f = os.path.join(path, progname)
                     break
                 else:
-                    print '"{}" cannot be found under directory "{}"'.format(progname,path)
+                    print('"{}" cannot be found under directory "{}"'.format(progname,path))
             else:
                 if os.path.exists(path):
                     f = path
                     break
                 else:
-                    print '"{}" cannot be found'.format(path)
+                    print('"{}" cannot be found'.format(path))
 
 
     return f
@@ -167,13 +167,13 @@ def main():
     if os.path.exists(cfg):
         config = json.load(open(cfg))
     else:
-        print "Configuration file does not exist, creating new config"
+        print("Configuration file does not exist, creating new config")
         config = copy.deepcopy(default_config)
 
     # Try and detect if the programs exist
-    for tool, name in default_config['tools'].items():
+    for tool, name in list(default_config['tools'].items()):
         try:
-            if not isinstance(config['tools'][tool], str) and not isinstance(config['tools'][tool], unicode):
+            if not isinstance(config['tools'][tool], str) and not isinstance(config['tools'][tool], str):
                 config['tools'][tool] = default_config['tools'][tool]
         except KeyError:
             config['tools'][tool] = default_config['tools'][tool]
@@ -181,7 +181,7 @@ def main():
 
     # For each platform, check we have the dependencies
     config['enabled'] = []
-    for platform in default_config['platforms'].keys():
+    for platform in list(default_config['platforms'].keys()):
         haveTools = True
         for tool in default_config['platforms'][platform]:
             if config['tools'][tool] is None:
@@ -198,9 +198,9 @@ def main():
         indent=2)
 
     # Display a summary
-    print "\nSummary\n"
-    for platform in default_config['platforms'].keys():
-        print "{: <20}      {}".format(platform, "enabled" if platform in config['enabled'] else "disabled")
+    print("\nSummary\n")
+    for platform in list(default_config['platforms'].keys()):
+        print("{: <20}      {}".format(platform, "enabled" if platform in config['enabled'] else "disabled"))
 
 if __name__=="__main__":
     main()

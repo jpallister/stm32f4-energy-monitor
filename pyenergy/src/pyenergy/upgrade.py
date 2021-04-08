@@ -14,7 +14,7 @@ Options
     --verbose -v        Be verbose
 """
 
-import pyenergy
+from . import pyenergy
 import logging
 from docopt import docopt
 
@@ -78,7 +78,7 @@ def updateOldPickle(fname):
             break
     f.close()
 
-    print o[0][0]
+    print(o[0][0])
 
     f = open(fname, "w")
     for o in objs:
